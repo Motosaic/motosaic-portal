@@ -99,6 +99,7 @@ export interface IStorage {
   updateClientDriveFolder(id: number, driveFolder: string): schema.Client | undefined;
   updateClientQuestionnaire(id: number, data: Partial<schema.InsertClient>): schema.Client | undefined;
   markQuestionnaireComplete(id: number): schema.Client | undefined;
+  deleteClient(id: number): void;
   // Documents
   getDocumentsByClient(clientId: number): schema.Document[];
   createDocument(data: schema.InsertDocument): schema.Document;
@@ -193,6 +194,11 @@ export class Storage implements IStorage {
 
   deleteDocument(id: number): void {
     db.delete(schema.documents).where(eq(schema.documents.id, id)).run();
+  }
+
+  deleteClient(id: number): void {
+    db.delete(schema.documents).where(eq(schema.documents.clientId, id)).run();
+    db.delete(schema.clients).where(eq(schema.clients.id, id)).run();
   }
 
   updateClientAssignment(id: number, assignedTo: string | null): schema.Client | undefined {

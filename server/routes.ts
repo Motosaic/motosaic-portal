@@ -86,6 +86,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(client);
   });
 
+  app.delete("/api/clients/:id", (req, res) => {
+    const id = parseInt(req.params.id);
+    const client = storage.getClient(id);
+    if (!client) return res.status(404).json({ message: "Client not found" });
+    storage.deleteClient(id);
+    res.json({ message: "Client deleted" });
+  });
+
   app.patch("/api/clients/:id/drive-folder", (req, res) => {
     const id = parseInt(req.params.id);
     const { driveFolder } = z.object({ driveFolder: z.string() }).parse(req.body);

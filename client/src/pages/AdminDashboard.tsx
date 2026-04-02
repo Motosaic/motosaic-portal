@@ -109,6 +109,13 @@ export default function AdminDashboard() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/clients"] }),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/clients/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/clients"] }),
+  });
+
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+
   if (!unlocked) return <AdminPasswordGate onUnlock={() => setUnlocked(true)} />;
 
   const filtered = clients.filter(c => {
@@ -310,7 +317,7 @@ export default function AdminDashboard() {
                     </div>
 
                     {/* Status dropdown */}
-                    <div className="flex-shrink-0 ml-2" onClick={e => e.stopPropagation()}>
+                    <div className="flex-shrink-0 ml-2 flex items-center gap-2" onClick={e => e.stopPropagation()}>
                       <select
                         value={client.status || "new"}
                         onChange={e => statusMutation.mutate({ id: client.id, status: e.target.value })}
@@ -326,6 +333,35 @@ export default function AdminDashboard() {
                           <option key={s} value={s}>{STATUS_LABELS[s]}</option>
                         ))}
                       </select>
+                      {/* Delete button */}
+                      {confirmDeleteId === client.id ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => { deleteMutation.mutate(client.id); setConfirmDeleteId(null); }}
+                            className="px-2 py-1.5 rounded-lg text-xs font-bold transition-all"
+                            style={{ background: "rgba(239,68,68,0.2)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.35)", fontFamily: "Industry, sans-serif" }}>
+                            Confirm
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="px-2 py-1.5 rounded-lg text-xs font-bold transition-all"
+                            style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.45)", border: "1px solid rgba(255,255,255,0.1)", fontFamily: "Industry, sans-serif" }}>
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDeleteId(client.id)}
+                          data-testid={`delete-client-${client.id}`}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:opacity-80"
+                          style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)" }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                            <path d="M10 11v6M14 11v6"/>
+                          </svg>
+                        </button>
+                      )}
                     </div>
 
                     <svg className="flex-shrink-0 ml-2" width="16" height="16" viewBox="0 0 24 24" fill="none"

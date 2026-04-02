@@ -324,8 +324,8 @@ function DocPanel({ docs, clientId }: { docs: Document[]; clientId: string }) {
           </div>
           {/* Actions */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            <a href={`https://portal.motosaic.com/api/uploads/${doc.storedName}`}
-              target="_blank" rel="noopener noreferrer"
+            <a href={`https://portal.motosaic.com/api/files/${doc.storedName}/download`}
+              download={doc.originalName}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:opacity-80"
               style={{ background: "rgba(173,240,41,0.12)", color: "var(--gelbgrun)", border: "1px solid rgba(173,240,41,0.2)", textDecoration: "none" }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
