@@ -95,6 +95,9 @@ addColumnIfMissing("clients", "suv_has_pets", "TEXT");
 addColumnIfMissing("clients", "costco_membership", "TEXT");
 addColumnIfMissing("clients", "is_veteran", "TEXT");
 addColumnIfMissing("clients", "household_vehicles", "TEXT");
+addColumnIfMissing("clients", "suv_max_seating", "TEXT");
+addColumnIfMissing("clients", "powertrain", "TEXT");
+addColumnIfMissing("clients", "ev_long_range", "TEXT");
 
 export interface IStorage {
   // Clients

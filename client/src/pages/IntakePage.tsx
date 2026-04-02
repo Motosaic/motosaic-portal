@@ -30,9 +30,12 @@ type FormData = {
   preferredModels: string; mustHaveFeatures: string; niceToHaveFeatures: string;
   exteriorColors: string[]; interiorColors: string[];
   suvSeatConfig: string;     // "captains" | "bench" | "no_preference"
+  suvMaxSeating: string;     // "6" | "7" | "8"
   suvNumChildren: string;
   suvChildAges: string;
   suvHasPets: string;        // "yes" | "no"
+  powertrain: string;        // "ev" | "phev" | "gas" | "indifferent"
+  evLongRange: string;       // "yes" | "no" — only asked if powertrain === "ev"
   // Step 4
   hasTradeIn: boolean; tradeYear: string; tradeMake: string; tradeModel: string;
   tradeTrim: string; tradeMileage: string; tradeCondition: string; tradeOwed: string;
@@ -48,7 +51,8 @@ const initial: FormData = {
   bodyStyles: [], preferredMakes: [],
   preferredModels: "", mustHaveFeatures: "", niceToHaveFeatures: "",
   exteriorColors: [], interiorColors: [],
-  suvSeatConfig: "", suvNumChildren: "", suvChildAges: "", suvHasPets: "",
+  suvSeatConfig: "", suvMaxSeating: "", suvNumChildren: "", suvChildAges: "", suvHasPets: "",
+  powertrain: "", evLongRange: "",
   hasTradeIn: false, tradeYear: "", tradeMake: "", tradeModel: "", tradeTrim: "",
   tradeMileage: "", tradeCondition: "", tradeOwed: "",
 };
@@ -89,17 +93,23 @@ const ANNUAL_MILEAGE = [
 const STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 
 const MUST_HAVE_CHIPS = [
-  "Sunroof / Moonroof", "AWD / 4WD", "Heated Seats", "Third Row",
+  "Standard Sunroof", "Panoramic (XL) Sunroof", "AWD / 4WD", "Heated Seats",
+  "Heated Steering Wheel", "Ventilated / Cooled Seats", "Third Row",
   "Apple CarPlay / Android Auto", "Backup Camera", "Blind Spot Monitoring",
-  "Tow Package", "Cooled Seats", "Ventilated Seats", "Leather Interior",
-  "HUD", "Parking Sensors", "Remote Start", "Premium Audio",
+  "Tow Package", "Leather Interior", "Heads Up Display (HUD)",
+  "Parking Sensors", "Remote Start", "Premium Audio",
+  "Power Liftgate", "Self-Driving / Driver Assist Suite",
+  "Plug-In Hybrid (PHEV)", "Electric Vehicle (EV)",
 ];
 
 const NICE_TO_HAVE_CHIPS = [
-  "Sunroof / Moonroof", "AWD / 4WD", "Heated Seats", "Third Row",
+  "Standard Sunroof", "Panoramic (XL) Sunroof", "AWD / 4WD", "Heated Seats",
+  "Heated Steering Wheel", "Ventilated / Cooled Seats", "Third Row",
   "Apple CarPlay / Android Auto", "Backup Camera", "Blind Spot Monitoring",
-  "Tow Package", "Cooled Seats", "Ventilated Seats", "Leather Interior",
-  "HUD", "Parking Sensors", "Remote Start", "Premium Audio",
+  "Tow Package", "Leather Interior", "Heads Up Display (HUD)",
+  "Parking Sensors", "Remote Start", "Premium Audio",
+  "Power Liftgate", "Self-Driving / Driver Assist Suite",
+  "Plug-In Hybrid (PHEV)", "Electric Vehicle (EV)",
   "Wireless Charging", "360° Camera", "Lane Keep Assist", "Adaptive Cruise Control",
 ];
 
@@ -782,6 +792,18 @@ export default function IntakePage() {
                       />
                     </Field>
 
+                    <Field label="How many seats do you need at maximum?">
+                      <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 4, marginBottom: 6, lineHeight: 1.5 }}>
+                        Some SUVs seat 6 with captain's chairs and no middle-row pass-through; others seat 7 or 8 with a bench. A few third rows fit only small kids. Knowing your max helps us narrow it down.
+                      </p>
+                      <ToggleGroup
+                        options={[["6","Seats 6"],["7","Seats 7"],["8","Seats 8"]]}
+                        value={form.suvMaxSeating}
+                        onChange={v => set("suvMaxSeating", v)}
+                        testPrefix="btn-suv-seating"
+                      />
+                    </Field>
+
                     <Field label="Number of children riding regularly">
                       <ToggleGroup
                         options={[["0","0"],["1","1"],["2","2"],["3","3"],["4+","4+"]]}
@@ -793,6 +815,9 @@ export default function IntakePage() {
 
                     {form.suvNumChildren && form.suvNumChildren !== "0" && (
                       <Field label="Ages of children" hint="approximate is fine">
+                        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 4, marginBottom: 6, lineHeight: 1.5 }}>
+                          Helps us flag seating that fits a booster seat, child seat, or neither — especially important for third-row and captain's chair configurations.
+                        </p>
                         <input
                           className="intake-input"
                           placeholder="e.g. 4, 7, 12"
@@ -812,6 +837,33 @@ export default function IntakePage() {
                       />
                     </Field>
                   </div>
+                )}
+
+                {/* Powertrain preference */}
+                <Field label="What type of powertrain are you open to?">
+                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 4, marginBottom: 6, lineHeight: 1.5 }}>
+                    Helps us understand whether EVs, plug-in hybrids, or traditional gas vehicles are worth exploring together.
+                  </p>
+                  <ToggleGroup
+                    options={[["ev","Electric (EV)"],["phev","Plug-In Hybrid"],["gas","Gas Only"],["indifferent","Open to Any"]]}
+                    value={form.powertrain}
+                    onChange={v => set("powertrain", v)}
+                    testPrefix="btn-powertrain"
+                  />
+                </Field>
+
+                {form.powertrain === "ev" && (
+                  <Field label="Do you regularly drive more than 200 miles in a single day?">
+                    <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 4, marginBottom: 6, lineHeight: 1.5 }}>
+                      Most EVs have a 200–300 mile range. If long daily drives are common, we'll focus on longer-range models or those with fast-charging networks along your routes.
+                    </p>
+                    <ToggleGroup
+                      options={[["yes","Yes, regularly"],["no","No, rarely or never"]]}
+                      value={form.evLongRange}
+                      onChange={v => set("evLongRange", v)}
+                      testPrefix="btn-ev-range"
+                    />
+                  </Field>
                 )}
 
                 {/* Brands section — renamed */}
