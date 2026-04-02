@@ -27,6 +27,7 @@ app.use(cors({
     /\.perplexity\.ai$/,
     /\.pplx\.app$/,
     /localhost/,
+    /motosaic\.com$/,
   ],
   credentials: true,
 }));
