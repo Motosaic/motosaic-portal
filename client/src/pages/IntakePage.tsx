@@ -13,16 +13,26 @@ const STEPS = [
   { label: "Trade-In", icon: "🔄" },
 ];
 
+type HouseholdVehicle = { year: string; make: string };
+
 type FormData = {
   // Step 1
   firstName: string; lastName: string; address: string; city: string; state: string; zip: string;
   // Step 2
   purchaseType: string; budget: string; downPayment: string;
   monthlyPayment: string; annualMileage: string; creditScore: string; timeframe: string;
+  costcoMembership: string;  // "executive" | "standard" | "none"
+  isVeteran: string;         // "yes" | "no"
+  householdVehicles: HouseholdVehicle[];
   // Step 3
+  passengerCount: string;    // "1-2" | "3" | "4+"
   bodyStyles: string[]; preferredMakes: string[];
   preferredModels: string; mustHaveFeatures: string; niceToHaveFeatures: string;
   exteriorColors: string[]; interiorColors: string[];
+  suvSeatConfig: string;     // "captains" | "bench" | "no_preference"
+  suvNumChildren: string;
+  suvChildAges: string;
+  suvHasPets: string;        // "yes" | "no"
   // Step 4
   hasTradeIn: boolean; tradeYear: string; tradeMake: string; tradeModel: string;
   tradeTrim: string; tradeMileage: string; tradeCondition: string; tradeOwed: string;
@@ -32,9 +42,13 @@ const initial: FormData = {
   firstName: "", lastName: "", address: "", city: "", state: "", zip: "",
   purchaseType: "finance", budget: "", downPayment: "",
   monthlyPayment: "", annualMileage: "", creditScore: "", timeframe: "",
-  bodyStyles: [], preferredMakes: [], preferredModels: "",
-  mustHaveFeatures: "", niceToHaveFeatures: "",
+  costcoMembership: "", isVeteran: "",
+  householdVehicles: [],
+  passengerCount: "",
+  bodyStyles: [], preferredMakes: [],
+  preferredModels: "", mustHaveFeatures: "", niceToHaveFeatures: "",
   exteriorColors: [], interiorColors: [],
+  suvSeatConfig: "", suvNumChildren: "", suvChildAges: "", suvHasPets: "",
   hasTradeIn: false, tradeYear: "", tradeMake: "", tradeModel: "", tradeTrim: "",
   tradeMileage: "", tradeCondition: "", tradeOwed: "",
 };
@@ -74,6 +88,21 @@ const ANNUAL_MILEAGE = [
 
 const STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 
+const MUST_HAVE_CHIPS = [
+  "Sunroof / Moonroof", "AWD / 4WD", "Heated Seats", "Third Row",
+  "Apple CarPlay / Android Auto", "Backup Camera", "Blind Spot Monitoring",
+  "Tow Package", "Cooled Seats", "Ventilated Seats", "Leather Interior",
+  "HUD", "Parking Sensors", "Remote Start", "Premium Audio",
+];
+
+const NICE_TO_HAVE_CHIPS = [
+  "Sunroof / Moonroof", "AWD / 4WD", "Heated Seats", "Third Row",
+  "Apple CarPlay / Android Auto", "Backup Camera", "Blind Spot Monitoring",
+  "Tow Package", "Cooled Seats", "Ventilated Seats", "Leather Interior",
+  "HUD", "Parking Sensors", "Remote Start", "Premium Audio",
+  "Wireless Charging", "360° Camera", "Lane Keep Assist", "Adaptive Cruise Control",
+];
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function StepDots({ current, total }: { current: number; total: number }) {
@@ -109,7 +138,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
     <div>
       <label className="intake-label">
         {label}
-        {hint && <span style={{ fontWeight: 400, color: "rgba(255,255,255,0.35)", fontSize: 11, marginLeft: 6 }}>({hint})</span>}
+        {hint && <span style={{ fontWeight: 400, color: "rgba(255,255,255,0.6)", fontSize: 11, marginLeft: 6 }}>({hint})</span>}
       </label>
       {children}
     </div>
@@ -125,7 +154,7 @@ function MultiSelect({ options, value, onChange }: { options: string[]; value: s
           className="px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150"
           style={{
             background: value.includes(o) ? "var(--miami-blue)" : "rgba(255,255,255,0.07)",
-            color: value.includes(o) ? "var(--shelby-blue)" : "rgba(255,255,255,0.65)",
+            color: value.includes(o) ? "var(--shelby-blue)" : "rgba(255,255,255,0.75)",
             border: `1px solid ${value.includes(o) ? "var(--miami-blue)" : "rgba(255,255,255,0.1)"}`,
             fontFamily: "Industry, sans-serif",
             minHeight: 40,
@@ -133,6 +162,55 @@ function MultiSelect({ options, value, onChange }: { options: string[]; value: s
           {o}
         </button>
       ))}
+    </div>
+  );
+}
+
+// Chip selector for must-have / nice-to-have features
+function FeatureChips({
+  chips, selected, onChange, otherValue, onOtherChange, testPrefix,
+}: {
+  chips: string[];
+  selected: string[];
+  onChange: (v: string[]) => void;
+  otherValue: string;
+  onOtherChange: (v: string) => void;
+  testPrefix: string;
+}) {
+  const toggle = (chip: string) =>
+    onChange(selected.includes(chip) ? selected.filter(x => x !== chip) : [...selected, chip]);
+
+  return (
+    <div>
+      <div className="flex flex-wrap gap-2 mt-1">
+        {chips.map(chip => (
+          <button
+            key={chip}
+            type="button"
+            onClick={() => toggle(chip)}
+            className="px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150"
+            style={{
+              background: selected.includes(chip) ? "var(--miami-blue)" : "rgba(255,255,255,0.07)",
+              color: selected.includes(chip) ? "var(--shelby-blue)" : "rgba(255,255,255,0.75)",
+              border: `1px solid ${selected.includes(chip) ? "var(--miami-blue)" : "rgba(255,255,255,0.12)"}`,
+              fontFamily: "Industry, sans-serif",
+              minHeight: 40,
+            }}
+            data-testid={`chip-${testPrefix}-${chip.replace(/\W+/g, "_")}`}
+          >
+            {selected.includes(chip) ? "✓ " : ""}{chip}
+          </button>
+        ))}
+      </div>
+      <div className="mt-2">
+        <input
+          className="intake-input"
+          placeholder="Other (type anything else...)"
+          value={otherValue}
+          onChange={e => onOtherChange(e.target.value)}
+          data-testid={`input-${testPrefix}-other`}
+        />
+      </div>
     </div>
   );
 }
@@ -172,7 +250,7 @@ function TriStateMakes({ makes, state, onChange }: {
                 ? "#4ade80"
                 : isNo
                 ? "#f87171"
-                : "rgba(255,255,255,0.65)",
+                : "rgba(255,255,255,0.75)",
               border: `1px solid ${
                 isPreferred
                   ? "rgba(20,200,80,0.45)"
@@ -211,7 +289,7 @@ function ToggleGroup({ options, value, onChange, testPrefix }: {
           className="flex-1 rounded-xl font-bold transition-all"
           style={{
             background: value === v ? "var(--miami-blue)" : "rgba(255,255,255,0.07)",
-            color: value === v ? "var(--shelby-blue)" : "rgba(255,255,255,0.65)",
+            color: value === v ? "var(--shelby-blue)" : "rgba(255,255,255,0.75)",
             border: `1px solid ${value === v ? "var(--miami-blue)" : "rgba(255,255,255,0.1)"}`,
             fontFamily: "Industry, sans-serif",
             fontSize: 13,
@@ -226,6 +304,17 @@ function ToggleGroup({ options, value, onChange, testPrefix }: {
   );
 }
 
+// Section divider with label
+function SectionDivider({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 my-1">
+      <div className="flex-1 border-t" style={{ borderColor: "rgba(255,255,255,0.08)" }} />
+      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700 }}>{label}</span>
+      <div className="flex-1 border-t" style={{ borderColor: "rgba(255,255,255,0.08)" }} />
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function IntakePage() {
@@ -233,6 +322,13 @@ export default function IntakePage() {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormData>(initial);
   const [makesState, setMakesState] = useState<MakeState>({});
+
+  // Chip selections for must-have and nice-to-have (separate from free-text "other")
+  const [mustHaveChips, setMustHaveChips] = useState<string[]>([]);
+  const [mustHaveOther, setMustHaveOther] = useState("");
+  const [niceToHaveChips, setNiceToHaveChips] = useState<string[]>([]);
+  const [niceToHaveOther, setNiceToHaveOther] = useState("");
+
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
@@ -268,6 +364,14 @@ export default function IntakePage() {
   const preferredMakes = Object.entries(makesState).filter(([,v]) => v === 1).map(([k]) => k);
   const notInterestedMakes = Object.entries(makesState).filter(([,v]) => v === -1).map(([k]) => k);
 
+  // Build comma-separated feature strings from chips + other text
+  const buildFeatureString = (chips: string[], other: string): string => {
+    const parts = [...chips];
+    const otherTrimmed = other.trim();
+    if (otherTrimmed) parts.push(otherTrimmed);
+    return parts.join(", ");
+  };
+
   // Save questionnaire and mark complete
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -278,6 +382,9 @@ export default function IntakePage() {
         notInterestedMakes: JSON.stringify(notInterestedMakes),
         exteriorColors: JSON.stringify(data.exteriorColors),
         interiorColors: JSON.stringify(data.interiorColors),
+        householdVehicles: JSON.stringify(data.householdVehicles),
+        mustHaveFeatures: buildFeatureString(mustHaveChips, mustHaveOther),
+        niceToHaveFeatures: buildFeatureString(niceToHaveChips, niceToHaveOther),
       };
       await apiRequest("PATCH", `/api/clients/${clientId}/questionnaire`, payload);
       const res = await apiRequest("POST", `/api/clients/${clientId}/questionnaire-complete`);
@@ -300,6 +407,9 @@ export default function IntakePage() {
       notInterestedMakes: JSON.stringify(notInterestedMakes),
       exteriorColors: JSON.stringify(data.exteriorColors),
       interiorColors: JSON.stringify(data.interiorColors),
+      householdVehicles: JSON.stringify(data.householdVehicles),
+      mustHaveFeatures: buildFeatureString(mustHaveChips, mustHaveOther),
+      niceToHaveFeatures: buildFeatureString(niceToHaveChips, niceToHaveOther),
     };
     apiRequest("PATCH", `/api/clients/${clientId}/questionnaire`, payload).catch(() => {});
   };
@@ -336,18 +446,29 @@ export default function IntakePage() {
   const isCash = form.purchaseType === "cash";
   const isLease = form.purchaseType === "lease";
   const isFinance = form.purchaseType === "finance";
+  const hasSUV = form.bodyStyles.includes("SUV");
 
   const clientName = existingClient
     ? `${existingClient.firstName} ${existingClient.lastName}`
     : "";
+
+  // ── Household vehicles helpers ──
+  const addHouseholdVehicle = () =>
+    set("householdVehicles", [...form.householdVehicles, { year: "", make: "" }]);
+  const removeHouseholdVehicle = (i: number) =>
+    set("householdVehicles", form.householdVehicles.filter((_, idx) => idx !== i));
+  const updateHouseholdVehicle = (i: number, field: "year" | "make", value: string) => {
+    const updated = form.householdVehicles.map((v, idx) => idx === i ? { ...v, [field]: value } : v);
+    set("householdVehicles", updated);
+  };
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(160deg, #002639 0%, #004363 60%, #003552 100%)" }}>
       {/* Header */}
       <header className="flex items-center justify-between px-4 md:px-8 py-4 md:py-5 border-b flex-shrink-0" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
         <MotoLogoFull height={30} />
-        <div style={{ color: "rgba(255,255,255,0.45)", fontSize: 12 }}>
-          {clientName && <span className="hidden sm:inline" style={{ color: "rgba(255,255,255,0.3)", marginRight: 8 }}>{clientName} ·</span>}
+        <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }}>
+          {clientName && <span className="hidden sm:inline" style={{ color: "rgba(255,255,255,0.4)", marginRight: 8 }}>{clientName} ·</span>}
           Step {step + 1}/{STEPS.length} — {STEPS[step].label}
         </div>
       </header>
@@ -361,7 +482,7 @@ export default function IntakePage() {
             <h1 style={{ fontSize: 20, fontWeight: 900, color: "white", marginBottom: 4 }} className="md:text-2xl">
               {STEPS[step].label} Information
             </h1>
-            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)" }}>
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.65)" }}>
               {step === 0 && "Your contact and registration details."}
               {step === 1 && "Help us understand your budget and financing goals."}
               {step === 2 && "What kind of vehicle are you looking for?"}
@@ -536,36 +657,212 @@ export default function IntakePage() {
                     </FieldRow>
                   </div>
                 )}
+
+                <SectionDivider label="Savings & Incentives" />
+
+                {/* Costco membership */}
+                <Field label="Do you have a Costco membership?">
+                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 4, marginBottom: 8, lineHeight: 1.5 }}>
+                    Costco members regularly receive exclusive discounts — worth checking before we begin.
+                  </p>
+                  <ToggleGroup
+                    options={[["executive","Yes, Executive"],["standard","Yes, Standard"],["none","No"]]}
+                    value={form.costcoMembership}
+                    onChange={v => set("costcoMembership", v)}
+                    testPrefix="btn-costco"
+                  />
+                </Field>
+
+                {/* Veteran / First Responder */}
+                <Field label="Are you a veteran or first responder?">
+                  <ToggleGroup
+                    options={[["yes","Yes"],["no","No"]]}
+                    value={form.isVeteran}
+                    onChange={v => set("isVeteran", v)}
+                    testPrefix="btn-veteran"
+                  />
+                </Field>
+
+                <SectionDivider label="Loyalty Incentives" />
+
+                {/* Household vehicles */}
+                <div>
+                  <label className="intake-label">
+                    What vehicles are currently in your household?
+                    <span style={{ fontWeight: 400, color: "rgba(255,255,255,0.6)", fontSize: 11, marginLeft: 6 }}>(year and make)</span>
+                  </label>
+                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 4, marginBottom: 8, lineHeight: 1.5 }}>
+                    Existing brand ownership can unlock loyalty pricing.
+                  </p>
+                  {form.householdVehicles.length > 0 && (
+                    <div className="flex flex-col gap-2 mb-3">
+                      {form.householdVehicles.map((v, i) => (
+                        <div key={i} className="flex gap-2 items-center">
+                          <input
+                            className="intake-input flex-1"
+                            placeholder="Year (e.g. 2019)"
+                            value={v.year}
+                            onChange={e => updateHouseholdVehicle(i, "year", e.target.value)}
+                            data-testid={`input-hv-year-${i}`}
+                          />
+                          <input
+                            className="intake-input flex-1"
+                            placeholder="Make (e.g. Toyota)"
+                            value={v.make}
+                            onChange={e => updateHouseholdVehicle(i, "make", e.target.value)}
+                            data-testid={`input-hv-make-${i}`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeHouseholdVehicle(i)}
+                            style={{ color: "rgba(255,255,255,0.35)", fontSize: 20, minWidth: 36, minHeight: 36, flexShrink: 0 }}
+                            className="flex items-center justify-center hover:text-red-400 transition-colors"
+                            data-testid={`btn-remove-hv-${i}`}
+                          >×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={addHouseholdVehicle}
+                    data-testid="btn-add-hv"
+                    className="rounded-xl font-bold transition-all active:scale-95"
+                    style={{
+                      background: "rgba(31,195,239,0.08)",
+                      color: "var(--miami-blue)",
+                      border: "1px solid rgba(31,195,239,0.2)",
+                      fontFamily: "Industry, sans-serif",
+                      fontSize: 13,
+                      minHeight: 44,
+                      padding: "0 20px",
+                    }}
+                  >
+                    + Add Vehicle
+                  </button>
+                </div>
               </div>
             )}
 
             {/* ── Step 3: Vehicle Preferences ── */}
             {step === 2 && (
               <div className="flex flex-col gap-5">
+
+                {/* Passengers FIRST */}
+                <Field label="How many people will regularly be riding in it?">
+                  <ToggleGroup
+                    options={[["1-2","1–2 people"],["3","Up to 3"],["4+","4 or more"]]}
+                    value={form.passengerCount}
+                    onChange={v => set("passengerCount", v)}
+                    testPrefix="btn-passengers"
+                  />
+                </Field>
+
+                <div className="border-t" style={{ borderColor: "rgba(255,255,255,0.08)" }} />
+
+                {/* Body styles */}
                 <Field label="Body Style (select all that apply)">
                   <MultiSelect options={BODY_STYLES} value={form.bodyStyles} onChange={v => set("bodyStyles", v)} />
                 </Field>
-                <Field label="Preferred Makes" hint="just a starting point — doesn't have to be your final list">
-                  <p style={{ fontSize: 11, color: "rgba(255,255,255,0.38)", marginTop: 4, marginBottom: 6 }}>
-                    Tap once for ✓ preferred (green) · tap again for ✕ not interested (red) · tap again to clear
+
+                {/* Dynamic SUV follow-up */}
+                {hasSUV && (
+                  <div className="rounded-xl p-4 flex flex-col gap-4 animate-in"
+                    style={{ background: "rgba(31,195,239,0.05)", border: "1px solid rgba(31,195,239,0.12)" }}>
+                    <p style={{ fontSize: 12, fontWeight: 700, color: "var(--miami-blue)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                      SUV Details
+                    </p>
+
+                    <Field label="Seating configuration preference">
+                      <ToggleGroup
+                        options={[["captains","Captain's Chairs"],["bench","Bench Seat"],["no_preference","No Preference"]]}
+                        value={form.suvSeatConfig}
+                        onChange={v => set("suvSeatConfig", v)}
+                        testPrefix="btn-suv-seats"
+                      />
+                    </Field>
+
+                    <Field label="Number of children riding regularly">
+                      <ToggleGroup
+                        options={[["0","0"],["1","1"],["2","2"],["3","3"],["4+","4+"]]}
+                        value={form.suvNumChildren}
+                        onChange={v => set("suvNumChildren", v)}
+                        testPrefix="btn-suv-children"
+                      />
+                    </Field>
+
+                    {form.suvNumChildren && form.suvNumChildren !== "0" && (
+                      <Field label="Ages of children" hint="approximate is fine">
+                        <input
+                          className="intake-input"
+                          placeholder="e.g. 4, 7, 12"
+                          value={form.suvChildAges}
+                          onChange={e => set("suvChildAges", e.target.value)}
+                          data-testid="input-suv-child-ages"
+                        />
+                      </Field>
+                    )}
+
+                    <Field label="Do you have dogs or regularly haul large cargo?">
+                      <ToggleGroup
+                        options={[["yes","Yes"],["no","No"]]}
+                        value={form.suvHasPets}
+                        onChange={v => set("suvHasPets", v)}
+                        testPrefix="btn-suv-pets"
+                      />
+                    </Field>
+                  </div>
+                )}
+
+                {/* Brands section — renamed */}
+                <div>
+                  <label className="intake-label">Love It or Leave It — Your Best &amp; Worst Brands</label>
+                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 4, marginBottom: 6, lineHeight: 1.5 }}>
+                    Tap once for ✓ preferred (green) · tap again for ✕ not interested (red) · tap again to clear.
+                    You don't have to weigh in on every brand — just the ones that matter to you.
                   </p>
                   <TriStateMakes makes={MAKES} state={makesState} onChange={setMakesState} />
-                </Field>
+                </div>
+
                 <Field label="Specific Models in Mind">
                   <input className="intake-input" placeholder="e.g. RAV4, F-150, 3 Series..." value={form.preferredModels}
                     onChange={e => set("preferredModels", e.target.value)} data-testid="input-models" />
                 </Field>
-                <Field label="Must-Have Features">
-                  <textarea className="intake-input" rows={3} placeholder="e.g. Sunroof, AWD, heated seats, third row..."
-                    value={form.mustHaveFeatures} onChange={e => set("mustHaveFeatures", e.target.value)}
-                    data-testid="textarea-must-have" style={{ resize: "none" }} />
-                </Field>
-                <Field label="Nice-to-Have Features">
-                  <textarea className="intake-input" rows={3} placeholder="e.g. Apple CarPlay, premium audio, cooled seats..."
-                    value={form.niceToHaveFeatures} onChange={e => set("niceToHaveFeatures", e.target.value)}
-                    data-testid="textarea-nice-to-have" style={{ resize: "none" }} />
-                </Field>
+
+                {/* Must-have features chips */}
+                <div>
+                  <label className="intake-label">Must-Have Features</label>
+                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 4, marginBottom: 2, lineHeight: 1.5 }}>
+                    Tap to select — these are deal-breakers we'll prioritize.
+                  </p>
+                  <FeatureChips
+                    chips={MUST_HAVE_CHIPS}
+                    selected={mustHaveChips}
+                    onChange={setMustHaveChips}
+                    otherValue={mustHaveOther}
+                    onOtherChange={setMustHaveOther}
+                    testPrefix="must-have"
+                  />
+                </div>
+
+                {/* Nice-to-have features chips */}
+                <div>
+                  <label className="intake-label">Nice-to-Have Features</label>
+                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 4, marginBottom: 2, lineHeight: 1.5 }}>
+                    Would love these but won't walk away without them.
+                  </p>
+                  <FeatureChips
+                    chips={NICE_TO_HAVE_CHIPS}
+                    selected={niceToHaveChips}
+                    onChange={setNiceToHaveChips}
+                    otherValue={niceToHaveOther}
+                    onOtherChange={setNiceToHaveOther}
+                    testPrefix="nice-to-have"
+                  />
+                </div>
+
                 <div className="border-t" style={{ borderColor: "rgba(255,255,255,0.08)" }} />
+
                 <Field label="Exterior Color Preference (select all that apply)">
                   <MultiSelect options={EXTERIOR_COLORS} value={form.exteriorColors} onChange={v => set("exteriorColors", v)} />
                 </Field>
@@ -585,7 +882,7 @@ export default function IntakePage() {
                         className="flex-1 rounded-xl font-bold transition-all"
                         style={{
                           background: form.hasTradeIn === v ? "var(--miami-blue)" : "rgba(255,255,255,0.07)",
-                          color: form.hasTradeIn === v ? "var(--shelby-blue)" : "rgba(255,255,255,0.65)",
+                          color: form.hasTradeIn === v ? "var(--shelby-blue)" : "rgba(255,255,255,0.75)",
                           border: `1px solid ${form.hasTradeIn === v ? "var(--miami-blue)" : "rgba(255,255,255,0.1)"}`,
                           fontFamily: "Industry, sans-serif",
                           fontSize: 13,
@@ -646,7 +943,7 @@ export default function IntakePage() {
 
                 {!form.hasTradeIn && (
                   <div className="rounded-xl p-5 text-center" style={{ background: "rgba(31,195,239,0.06)", border: "1px solid rgba(31,195,239,0.15)" }}>
-                    <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 14 }}>
+                    <p style={{ color: "rgba(255,255,255,0.65)", fontSize: 14 }}>
                       No trade-in — got it. After submitting, you'll be prompted to upload your key documents.
                     </p>
                   </div>
@@ -682,7 +979,7 @@ export default function IntakePage() {
             </button>
           </div>
 
-          <p className="hidden md:block text-center mt-4" style={{ fontSize: 12, color: "rgba(255,255,255,0.3)" }}>
+          <p className="hidden md:block text-center mt-4" style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>
             Your progress is saved automatically. You can return at any time.
           </p>
         </div>
@@ -723,7 +1020,7 @@ export default function IntakePage() {
             {mutation.isPending ? "Saving..." : step === STEPS.length - 1 ? "Save & Continue →" : `Continue to ${STEPS[Math.min(step + 1, STEPS.length - 1)].label} →`}
           </button>
         </div>
-        <p className="text-center mt-2" style={{ fontSize: 11, color: "rgba(255,255,255,0.25)" }}>
+        <p className="text-center mt-2" style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>
           Progress saved automatically
         </p>
       </div>

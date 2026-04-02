@@ -30,6 +30,16 @@ export const clients = sqliteTable("clients", {
   niceToHaveFeatures: text("nice_to_have_features"),
   exteriorColors: text("exterior_colors"),
   interiorColors: text("interior_colors"), // JSON array
+  // New Questionnaire Fields (batch 2)
+  notInterestedMakes: text("not_interested_makes"),  // JSON array
+  passengerCount: text("passenger_count"),           // "1-2" | "3" | "4+"
+  suvSeatConfig: text("suv_seat_config"),             // "captains" | "bench" | "no_preference"
+  suvNumChildren: text("suv_num_children"),           // "0" | "1" | "2" | "3" | "4+"
+  suvChildAges: text("suv_child_ages"),               // free text
+  suvHasPets: text("suv_has_pets"),                   // "yes" | "no"
+  costcoMembership: text("costco_membership"),        // "executive" | "standard" | "none"
+  isVeteran: text("is_veteran"),                     // "yes" | "no"
+  householdVehicles: text("household_vehicles"),     // JSON array of {year, make}
   // Trade-In
   hasTradeIn: integer("has_trade_in", { mode: "boolean" }).default(false),
   tradeYear: text("trade_year"),

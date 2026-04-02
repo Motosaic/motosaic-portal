@@ -25,15 +25,6 @@ const DOC_SECTIONS = [
     ],
   },
   {
-    title: "Financial Documents",
-    description: "Helps us assess your financing options. Optional but recommended.",
-    docs: [
-      { key: "income",       label: "Proof of Income",       icon: "💵", required: false, phase: "initial" },
-      { key: "registration", label: "Current Registration",  icon: "📄", required: false, phase: "initial" },
-      { key: "other",        label: "Other Documents",        icon: "📎", required: false, phase: "initial" },
-    ],
-  },
-  {
     title: "Updated Insurance — New Vehicle",
     description: "Required once we secure your new vehicle. You can come back and upload these later.",
     badge: "After Vehicle Secured",
@@ -54,6 +45,15 @@ const DOC_SECTIONS = [
         required: true,
         phase: "post_purchase",
       },
+    ],
+  },
+  {
+    title: "Other Documents",
+    description: "Optional but helpful — upload anything else that might be relevant. (Registration, Costco Membership Card, Proof of Income, etc.)",
+    docs: [
+      { key: "income",       label: "Proof of Income",       icon: "💵", required: false, phase: "initial" },
+      { key: "registration", label: "Current Registration",  icon: "📄", required: false, phase: "initial" },
+      { key: "other",        label: "Other Documents",        icon: "📎", required: false, phase: "initial" },
     ],
   },
 ];
@@ -260,7 +260,7 @@ export default function UploadPage() {
         {client && (
           <div className="text-right">
             <p style={{ fontSize: 13, fontWeight: 700, color: "white" }}>{clientName}</p>
-            <p className="hidden sm:block" style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{client.email}</p>
+            <p className="hidden sm:block" style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>{client.email}</p>
           </div>
         )}
       </header>
@@ -269,7 +269,7 @@ export default function UploadPage() {
         <div className="w-full animate-in" style={{ maxWidth: 700 }}>
 
           {/* Progress header */}
-          <div className="mb-6 md:mb-8">
+          <div className="mb-5 md:mb-7">
             <div className="flex items-start justify-between mb-2 gap-3">
               <div className="flex-1 min-w-0">
                 <p style={{ color: "var(--miami-blue)", fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 4 }}>
@@ -282,7 +282,7 @@ export default function UploadPage() {
                 {totalProgress}/{totalRequired} Required
               </span>
             </div>
-            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginTop: 8 }}>
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.65)", marginTop: 8 }}>
               Upload what you have now and come back any time to add more.
               Items marked ★ are required.
             </p>
@@ -295,6 +295,19 @@ export default function UploadPage() {
                   background: "linear-gradient(90deg, var(--miami-blue), var(--sao-paulo))",
                 }} />
             </div>
+          </div>
+
+          {/* ── Expedite banner ── */}
+          <div className="rounded-xl px-4 py-3 mb-6 flex gap-3 items-start"
+            style={{
+              background: "rgba(242,234,0,0.08)",
+              border: "1px solid rgba(242,234,0,0.28)",
+            }}>
+            <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>⚡</span>
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", lineHeight: 1.55 }}>
+              <span style={{ color: "var(--sao-paulo)", fontWeight: 700 }}>Upload your driver's license and current insurance card now</span>{" "}
+              to keep things moving — when it's time to finalize your deal, having these on file means no last-minute scramble during business hours.
+            </p>
           </div>
 
           {/* Document sections */}
@@ -313,7 +326,7 @@ export default function UploadPage() {
                       </span>
                     )}
                   </div>
-                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 10 }}>{section.description}</p>
+                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", marginBottom: 10 }}>{section.description}</p>
 
                   {/* Doc slots */}
                   <div className="flex flex-col gap-3">
@@ -339,7 +352,7 @@ export default function UploadPage() {
                                   )}
                                 </div>
                                 {"sublabel" in dt && dt.sublabel && (
-                                  <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>{dt.sublabel}</p>
+                                  <p style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>{dt.sublabel}</p>
                                 )}
                                 {isDone && (
                                   <p style={{ fontSize: 12, color: "var(--gelbgrun)", marginTop: 2 }}>
@@ -382,7 +395,7 @@ export default function UploadPage() {
                                     </div>
                                     <div className="min-w-0">
                                       <p style={{ fontSize: 12, color: "rgba(255,255,255,0.8)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{doc.originalName}</p>
-                                      <p style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>{formatBytes(doc.fileSize)}</p>
+                                      <p style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>{formatBytes(doc.fileSize)}</p>
                                     </div>
                                   </div>
                                   <button
@@ -429,7 +442,7 @@ export default function UploadPage() {
             )}
           </div>
 
-          <p className="hidden md:block text-center mt-4" style={{ fontSize: 12, color: "rgba(255,255,255,0.3)" }}>
+          <p className="hidden md:block text-center mt-4" style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>
             Your uploads are saved automatically. Log back in any time to continue.
           </p>
         </div>

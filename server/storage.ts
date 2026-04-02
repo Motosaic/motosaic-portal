@@ -85,6 +85,16 @@ addColumnIfMissing("clients", "final_int_color", "TEXT");
 addColumnIfMissing("clients", "final_options", "TEXT");
 addColumnIfMissing("clients", "final_zip", "TEXT");
 addColumnIfMissing("clients", "final_deal_notes", "TEXT");
+// Batch 2 questionnaire fields
+addColumnIfMissing("clients", "not_interested_makes", "TEXT");
+addColumnIfMissing("clients", "passenger_count", "TEXT");
+addColumnIfMissing("clients", "suv_seat_config", "TEXT");
+addColumnIfMissing("clients", "suv_num_children", "TEXT");
+addColumnIfMissing("clients", "suv_child_ages", "TEXT");
+addColumnIfMissing("clients", "suv_has_pets", "TEXT");
+addColumnIfMissing("clients", "costco_membership", "TEXT");
+addColumnIfMissing("clients", "is_veteran", "TEXT");
+addColumnIfMissing("clients", "household_vehicles", "TEXT");
 
 export interface IStorage {
   // Clients
