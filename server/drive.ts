@@ -11,6 +11,28 @@ import { Readable } from "stream";
 import PDFDocument from "pdfkit";
 import type { Client, Document } from "@shared/schema";
 
+// ─── Persistent sheet URL ─────────────────────────────────────────────────────
+const SHEET_URL_FILE = process.env.MINERVA_SHEET_URL_FILE || "/data/minerva-sheet-url.txt";
+
+export function getStoredSheetUrl(): string | null {
+  try {
+    if (fs.existsSync(SHEET_URL_FILE)) {
+      return fs.readFileSync(SHEET_URL_FILE, "utf-8").trim() || null;
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+function storeSheetUrl(url: string): void {
+  try {
+    const dir = path.dirname(SHEET_URL_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(SHEET_URL_FILE, url, "utf-8");
+  } catch (err) {
+    console.error("[sheet] Failed to persist sheet URL:", err);
+  }
+}
+
 // ─── OAuth2 Client ────────────────────────────────────────────────────────────
 
 export function getOAuthClient() {
@@ -279,4 +301,257 @@ export async function syncClientToDrive(client: Client, documents: Document[], u
 
   // Return the Drive folder URL
   return `https://drive.google.com/drive/folders/${clientFolderId}`;
+}
+
+// ─── Minerva Google Sheet sync ─────────────────────────────────────────────────────────────
+
+const SHEET_TITLE = "Motosaic — Minerva Clients";
+const TAB_NAME    = "Minerva";
+
+// Column A is a hidden client ID for upsert matching. Cols B–U are displayed.
+const HEADERS = [
+  "Client ID",        // A  (hidden)
+  "Name",             // B
+  "Email",            // C
+  "Phone",            // D
+  "Status",           // E
+  "Questionnaire",    // F
+  "DL Front",         // G
+  "DL Back",          // H
+  "Current Insurance",// I
+  "Updated Insurance",// J
+  "Budget",           // K
+  "Purchase Type",    // L
+  "Body Styles",      // M
+  "Passengers",       // N
+  "Powertrain",       // O
+  "Must-Have Features",// P
+  "Nice-to-Have",     // Q
+  "Trade-In",         // R
+  "Timeframe",        // S
+  "Drive Folder",     // T
+  "Last Updated",     // U
+];
+
+function parseJsonArr(str?: string | null): string[] {
+  try { return JSON.parse(str || "[]"); } catch { return []; }
+}
+
+function formatRow(client: Client, docTypes: string[]): string[] {
+  const has = (type: string) => docTypes.includes(type) ? "✓" : "";
+  const bodies = parseJsonArr(client.bodyStyles);
+  const trade = client.hasTradeIn
+    ? [client.tradeYear, client.tradeMake, client.tradeModel].filter(Boolean).join(" ") || "Yes"
+    : "No";
+
+  return [
+    String(client.id),                                           // A: hidden ID
+    `${client.firstName} ${client.lastName}`.trim(),             // B
+    client.email ?? "",                                         // C
+    client.phone ?? "",                                         // D
+    client.status ?? "",                                        // E
+    client.questionnaireComplete ? "✓ Complete" : "Pending",    // F
+    has("dl_front"),                                             // G
+    has("dl_back"),                                              // H
+    has("current_insurance"),                                    // I
+    has("updated_insurance"),                                    // J
+    client.budget ?? "",                                        // K
+    client.purchaseType ?? "",                                  // L
+    bodies.join(", "),                                           // M
+    client.passengerCount != null ? String(client.passengerCount) : "", // N
+    client.powertrain ?? "",                                    // O
+    client.mustHaveFeatures ?? "",                              // P
+    client.niceToHaveFeatures ?? "",                            // Q
+    trade,                                                       // R
+    client.timeframe ?? "",                                     // S
+    client.driveFolder ?? "",                                   // T
+    new Date().toLocaleString("en-US", { timeZone: "America/New_York" }), // U
+  ];
+}
+
+export async function syncMinervaSheet(
+  getAllClients: () => Client[],
+  getDocsByClient: (id: number) => Document[],
+): Promise<string> {
+  const auth  = getOAuthClient();
+  const drive = google.drive({ version: "v3", auth });
+  const sheets = google.sheets({ version: "v4", auth });
+
+  // ── 1. Find or create the spreadsheet in the Motosaic Clients parent folder ──
+  const parentId = await getOrCreateFolder(drive, PARENT_FOLDER_NAME);
+
+  let spreadsheetId: string;
+  const searchRes = await drive.files.list({
+    q: `name='${SHEET_TITLE}' and mimeType='application/vnd.google-apps.spreadsheet' and '${parentId}' in parents and trashed=false`,
+    fields: "files(id)",
+    spaces: "drive",
+  });
+
+  if (searchRes.data.files && searchRes.data.files.length > 0) {
+    spreadsheetId = searchRes.data.files[0].id!;
+  } else {
+    // Create new spreadsheet inside the parent folder
+    const created = await drive.files.create({
+      requestBody: {
+        name: SHEET_TITLE,
+        mimeType: "application/vnd.google-apps.spreadsheet",
+        parents: [parentId],
+      },
+      fields: "id",
+    });
+    spreadsheetId = created.data.id!;
+
+    // Make it publicly readable (anyone with link)
+    await drive.permissions.create({
+      fileId: spreadsheetId,
+      requestBody: { type: "anyone", role: "reader" },
+    });
+  }
+
+  // ── 2. Ensure the "Minerva" tab exists ──
+  const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
+  const existingSheets = spreadsheet.data.sheets ?? [];
+  let sheetId: number;
+  const tabMatch = existingSheets.find((s) => s.properties?.title === TAB_NAME);
+
+  if (tabMatch) {
+    sheetId = tabMatch.properties!.sheetId!;
+  } else {
+    // Rename the default Sheet1 to "Minerva" if it exists, else add new tab
+    const sheet1 = existingSheets.find((s) => s.properties?.title === "Sheet1");
+    if (sheet1) {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: [{
+            updateSheetProperties: {
+              properties: { sheetId: sheet1.properties!.sheetId, title: TAB_NAME },
+              fields: "title",
+            },
+          }],
+        },
+      });
+      sheetId = sheet1.properties!.sheetId!;
+    } else {
+      const addRes = await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: [{ addSheet: { properties: { title: TAB_NAME } } }],
+        },
+      });
+      sheetId = addRes.data.replies![0].addSheet!.properties!.sheetId!;
+    }
+  }
+
+  // ── 3. Read existing data to build ID→rowIndex map + check for header ──
+  const existing = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: `${TAB_NAME}!A:A`,
+  });
+  const existingRows = existing.data.values ?? [];
+  const hasHeader = existingRows[0]?.[0] === "Client ID";
+
+  // If no header yet, write it to row 1 first
+  if (!hasHeader) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `${TAB_NAME}!A1`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [HEADERS] },
+    });
+    // Treat existing rows as empty — header is now row 1
+    existingRows.length = 1;
+    existingRows[0] = HEADERS;
+  }
+
+  // Build clientId → 1-based row index (skipping header row 0)
+  const existingIds: Record<string, number> = {};
+  for (let i = 1; i < existingRows.length; i++) {
+    const cellId = existingRows[i]?.[0];
+    if (cellId) existingIds[cellId] = i + 1; // sheet rows are 1-based
+  }
+
+  // ── 4. Fetch assigned clients ──
+  const clients = getAllClients().filter(
+    (c) => c.assignedTo && c.assignedTo.startsWith("mike_")
+  );
+
+  // ── 5. Upsert rows ──
+  for (const client of clients) {
+    const docs = getDocsByClient(client.id);
+    const docTypes = docs.map((d) => d.docType);
+    const row = formatRow(client, docTypes);
+    const clientIdStr = String(client.id);
+
+    if (existingIds[clientIdStr]) {
+      // Update existing row in-place
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `${TAB_NAME}!A${existingIds[clientIdStr]}`,
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [row] },
+      });
+    } else {
+      // Append a new row after the last existing row
+      await sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range: `${TAB_NAME}!A1`,
+        valueInputOption: "USER_ENTERED",
+        insertDataOption: "INSERT_ROWS",
+        requestBody: { values: [row] },
+      });
+      // Track the newly appended row so the next client gets the right number
+      const nextRowIndex = Object.keys(existingIds).length + 2; // header=1, data starts at 2
+      existingIds[clientIdStr] = nextRowIndex;
+    }
+  }
+
+  // ── 7. Style the sheet: hide col A, freeze row 1, bold header ──
+  try {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [
+          // Freeze header row
+          { updateSheetProperties: { properties: { sheetId, gridProperties: { frozenRowCount: 1 } }, fields: "gridProperties.frozenRowCount" } },
+          // Bold + color header row
+          {
+            repeatCell: {
+              range: { sheetId, startRowIndex: 0, endRowIndex: 1 },
+              cell: {
+                userEnteredFormat: {
+                  textFormat: { bold: true, foregroundColor: { red: 0, green: 0.263, blue: 0.388 } },
+                  backgroundColor: { red: 0.122, green: 0.765, blue: 0.937 },
+                },
+              },
+              fields: "userEnteredFormat(textFormat,backgroundColor)",
+            },
+          },
+          // Hide column A (Client ID)
+          {
+            updateDimensionProperties: {
+              range: { sheetId, dimension: "COLUMNS", startIndex: 0, endIndex: 1 },
+              properties: { hiddenByUser: true },
+              fields: "hiddenByUser",
+            },
+          },
+          // Auto-resize all columns
+          {
+            autoResizeDimensions: {
+              dimensions: { sheetId, dimension: "COLUMNS", startIndex: 0, endIndex: HEADERS.length },
+            },
+          },
+        ],
+      },
+    });
+  } catch (err) {
+    // Styling is non-critical — log and continue
+    console.error("[sheet] Styling failed (non-fatal):", err);
+  }
+
+  // ── 8. Persist and return the URL ──
+  const sheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
+  storeSheetUrl(sheetUrl);
+  console.log(`[sheet] Minerva Sheet synced — ${clients.length} client(s) — ${sheetUrl}`);
+  return sheetUrl;
 }

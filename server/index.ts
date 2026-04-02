@@ -1,5 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
+import { registerRoutes, triggerSheetSync } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import cors from "cors";
@@ -112,4 +112,31 @@ app.use((req, res, next) => {
       log(`serving on port ${port}`);
     },
   );
+
+  // ─── Daily 6am ET Minerva Sheet sync ────────────────────────────────────────────────────
+  function scheduleDailySheetSync() {
+    const now = new Date();
+    // 6am Eastern = UTC-5 (EST) or UTC-4 (EDT). Use UTC-5 as conservative base.
+    // We schedule based on current UTC time — find next 11:00 UTC (= 6am EST)
+    const TARGET_HOUR_UTC = 11; // 6am ET (EST) = 11am UTC
+    const next = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      TARGET_HOUR_UTC, 0, 0, 0,
+    ));
+    // If already past today’s 11am UTC, schedule for tomorrow
+    if (now.getTime() >= next.getTime()) {
+      next.setUTCDate(next.getUTCDate() + 1);
+    }
+    const msUntil = next.getTime() - now.getTime();
+    log(`[sheet] Daily sync scheduled in ${Math.round(msUntil / 60000)} min (at ${next.toISOString()})`, "cron");
+    setTimeout(() => {
+      log("[sheet] Running daily Minerva Sheet sync", "cron");
+      triggerSheetSync();
+      // Reschedule for the next day
+      scheduleDailySheetSync();
+    }, msUntil);
+  }
+  scheduleDailySheetSync();
 })();

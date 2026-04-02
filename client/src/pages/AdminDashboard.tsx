@@ -5,6 +5,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { Client } from "@shared/schema";
 
+const API = import.meta.env.VITE_API_URL || "https://portal.motosaic.com";
+
 const ADMIN_USERNAME = "Admin";
 const ADMIN_PASSWORD = "AdminMotosaic";
 
@@ -69,6 +71,97 @@ function AdminPasswordGate({ onUnlock }: { onUnlock: () => void }) {
           </form>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Minerva Sheet Card ────────────────────────────────────────────────────────────
+function MinervaSheetCard() {
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  const { data: sheetData, refetch } = useQuery<{ sheetUrl: string }>({
+    queryKey: ["/api/admin/sheet-url"],
+    queryFn: async () => {
+      const res = await fetch(`${API}/api/admin/sheet-url`);
+      if (!res.ok) return null as any;
+      return res.json();
+    },
+    retry: false,
+    staleTime: 30_000,
+  });
+
+  const sheetUrl = sheetData?.sheetUrl ?? null;
+
+  async function handleSync() {
+    setSyncing(true);
+    setSyncError(null);
+    try {
+      const res = await fetch(`${API}/api/admin/sync-sheet`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Sync failed");
+      refetch();
+    } catch (err: any) {
+      setSyncError(err.message || "Unknown error");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl p-4" style={{ background: "rgba(173,240,41,0.08)", border: "1px solid rgba(173,240,41,0.2)" }}>
+      <p style={{ fontSize: 11, color: "#ADF029", fontWeight: 700, marginBottom: 4, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+        Minerva Sheet
+      </p>
+      {sheetUrl ? (
+        <a
+          href={sheetUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: "block",
+            fontSize: 12,
+            fontWeight: 700,
+            color: "#ADF029",
+            textDecoration: "none",
+            marginBottom: 8,
+            padding: "6px 10px",
+            borderRadius: 8,
+            background: "rgba(173,240,41,0.12)",
+            border: "1px solid rgba(173,240,41,0.25)",
+            textAlign: "center",
+          }}
+        >
+          Open Minerva Sheet →
+        </a>
+      ) : (
+        <p style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>
+          No sheet yet. Click Sync to create it.
+        </p>
+      )}
+      <button
+        onClick={handleSync}
+        disabled={syncing}
+        style={{
+          width: "100%",
+          fontSize: 11,
+          fontWeight: 700,
+          color: syncing ? "rgba(255,255,255,0.4)" : "#001f30",
+          background: syncing ? "rgba(173,240,41,0.15)" : "#ADF029",
+          border: "none",
+          borderRadius: 8,
+          padding: "6px 0",
+          cursor: syncing ? "not-allowed" : "pointer",
+          transition: "all 0.15s",
+          letterSpacing: "0.05em",
+          textTransform: "uppercase",
+        }}
+      >
+        {syncing ? "Syncing..." : "Sync Now"}
+      </button>
+      {syncError && (
+        <p style={{ fontSize: 10, color: "#ef4444", marginTop: 6 }}>{syncError}</p>
+      )}
     </div>
   );
 }
@@ -192,14 +285,7 @@ export default function AdminDashboard() {
           </span>
         </nav>
         <div className="mt-auto">
-          <div className="rounded-xl p-4" style={{ background: "rgba(31,195,239,0.08)", border: "1px solid rgba(31,195,239,0.15)" }}>
-            <p style={{ fontSize: 11, color: "var(--miami-blue)", fontWeight: 700, marginBottom: 4 }}>Google Drive Sync</p>
-            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>Push client data to Drive from the client detail view.</p>
-            <a href="https://drive.google.com" target="_blank" rel="noopener noreferrer"
-              style={{ fontSize: 11, color: "var(--miami-blue)", textDecoration: "underline" }}>
-              Open Drive →
-            </a>
-          </div>
+          <MinervaSheetCard />
         </div>
       </aside>
 

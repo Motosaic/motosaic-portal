@@ -6,7 +6,7 @@ import fs from "fs";
 import { storage } from "./storage";
 import { insertClientSchema, insertDocumentSchema } from "@shared/schema";
 import { z } from "zod";
-import { getAuthUrl, exchangeCodeForTokens, syncClientToDrive } from "./drive";
+import { getAuthUrl, exchangeCodeForTokens, syncClientToDrive, syncMinervaSheet, getStoredSheetUrl } from "./drive";
 
 const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(process.cwd(), "uploads");
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -19,6 +19,15 @@ const upload = multer({
     cb(null, allowed.includes(file.mimetype));
   },
 });
+
+// Fire-and-forget sheet sync helper (module-level so it can be called from anywhere in routes)
+export function triggerSheetSync() {
+  if (!process.env.GOOGLE_REFRESH_TOKEN) return;
+  syncMinervaSheet(
+    () => storage.getClients(),
+    (id: number) => storage.getDocumentsByClient(id),
+  ).catch((err) => console.error("[sheet] Background sync failed:", err));
+}
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<void> {
 
@@ -192,6 +201,35 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // ─── Minerva Google Sheet ────────────────────────────────────────────────────────────
+
+  // Manual full sync — returns the sheet URL
+  app.post("/api/admin/sync-sheet", async (_req, res) => {
+    if (!process.env.GOOGLE_REFRESH_TOKEN) {
+      return res.status(503).json({ message: "Google Drive not configured" });
+    }
+    try {
+      const sheetUrl = await syncMinervaSheet(
+        () => storage.getClients(),
+        (id: number) => storage.getDocumentsByClient(id),
+      );
+      res.json({ sheetUrl });
+    } catch (err) {
+      console.error("[sheet] Manual sync failed:", err);
+      res.status(500).json({ message: "Sheet sync failed", error: String(err) });
+    }
+  });
+
+  // Return the persisted sheet URL (so the admin dashboard can link to it)
+  app.get("/api/admin/sheet-url", (_req, res) => {
+    const url = getStoredSheetUrl();
+    if (url) {
+      res.json({ sheetUrl: url });
+    } else {
+      res.status(404).json({ message: "Sheet not yet created. Trigger a sync first." });
+    }
+  });
+
   // All doc types grouped by clientId — used by admin dashboard for at-a-glance status
   app.get("/api/documents/all", (_req, res) => {
     const docs = storage.getAllDocuments();
@@ -234,6 +272,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const client = storage.updateClientStatus(id, status);
     if (!client) return res.status(404).json({ message: "Client not found" });
     res.json(client);
+    triggerSheetSync();
   });
 
   app.patch("/api/clients/:id/notes", (req, res) => {
@@ -250,6 +289,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const client = storage.updateClientAssignment(id, assignedTo);
     if (!client) return res.status(404).json({ message: "Client not found" });
     res.json(client);
+    triggerSheetSync();
   });
 
   app.patch("/api/clients/:id/deal-build", (req, res) => {
@@ -330,7 +370,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(updated);
   });
 
-  // Mark questionnaire complete + auto-sync to Drive
+  // Mark questionnaire complete + auto-sync to Drive + sheet
   app.post("/api/clients/:id/questionnaire-complete", async (req, res) => {
     const id = parseInt(req.params.id);
     const client = storage.markQuestionnaireComplete(id);
@@ -345,6 +385,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       } catch (err) {
         console.error("Drive sync failed:", err);
       }
+      // Trigger Minerva sheet update
+      triggerSheetSync();
     }
   });
 
@@ -381,6 +423,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         } catch (err) {
           console.error("Drive doc sync failed:", err);
         }
+        // Trigger Minerva sheet update (doc uploaded)
+        triggerSheetSync();
       }
     }
   });
