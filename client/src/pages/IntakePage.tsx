@@ -911,7 +911,7 @@ export default function IntakePage() {
 
                     <Field label="How many seats do you need at maximum?">
                       <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 4, marginBottom: 6, lineHeight: 1.5 }}>
-                        Some SUVs seat 6 with captain's chairs and no middle-row pass-through; others seat 7 or 8 with a bench. A few third rows fit only small kids. Knowing your max helps us narrow it down.
+                        Captain's chairs in the middle row give you 6 seats (2+2+2) with a walk-through to the third row. A bench bumps it to 7 (2+3+2) or 8 (2+3+3) depending on the third row configuration. Third rows vary — some fit 2–3 adults comfortably, others are really only sized for kids.
                       </p>
                       <ToggleGroup
                         options={[["6","Seats 6"],["7","Seats 7"],["8","Seats 8"]]}
