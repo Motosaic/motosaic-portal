@@ -7,6 +7,7 @@
 import { google } from "googleapis";
 import fs from "fs";
 import path from "path";
+import { Readable } from "stream";
 import PDFDocument from "pdfkit";
 import type { Client, Document } from "@shared/schema";
 
@@ -225,11 +226,10 @@ export async function syncClientToDrive(client: Client, documents: Document[], u
     // Update existing
     await drive.files.update({
       fileId: existingPdf.data.files[0].id,
-      media: { mimeType: "application/pdf", body: require("stream").Readable.from(pdfBuffer) },
+      media: { mimeType: "application/pdf", body: Readable.from(pdfBuffer) },
     });
   } else {
     // Create new
-    const { Readable } = require("stream");
     await drive.files.create({
       requestBody: { name: pdfName, parents: [clientFolderId] },
       media: { mimeType: "application/pdf", body: Readable.from(pdfBuffer) },
