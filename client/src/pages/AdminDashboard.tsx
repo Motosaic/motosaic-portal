@@ -61,8 +61,8 @@ function AdminPasswordGate({ onUnlock }: { onUnlock: () => void }) {
 }
 
 const AGENTS: Record<string, { label: string; color: string }> = {
-  mike_standen:  { label: "Mike S",  color: "#1FC3EF" },
-  mike_minerva:  { label: "Mike M",  color: "#ADF029" },
+  mike_calcara:  { label: "Calcara",  color: "#1FC3EF" },
+  mike_minerva:  { label: "Minerva",  color: "#ADF029" },
 };
 
 const STATUS_OPTIONS = ["new", "in_progress", "ready", "closed"];

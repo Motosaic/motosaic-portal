@@ -8,7 +8,7 @@ import type { Client, Document } from "@shared/schema";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const AGENTS = [
-  { key: "mike_standen",  label: "Mike Standen",  initials: "MS", color: "#1FC3EF" },
+  { key: "mike_calcara",  label: "Mike Calcara",  initials: "MC", color: "#1FC3EF" },
   { key: "mike_minerva",  label: "Mike Minerva",  initials: "MM", color: "#ADF029" },
 ];
 

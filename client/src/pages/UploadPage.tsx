@@ -198,11 +198,6 @@ export default function UploadPage() {
               {client.phone && <p style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{client.phone}</p>}
             </div>
           )}
-          <button onClick={() => navigate("/portal")}
-            style={{ color: "rgba(255,255,255,0.35)", fontSize: 13, fontFamily: "Industry, sans-serif" }}
-            className="hover:text-white transition-colors">
-            ← Back to Portal
-          </button>
         </div>
       </header>
 
@@ -361,7 +356,7 @@ export default function UploadPage() {
                 fontSize: 15,
                 fontFamily: "Industry, sans-serif",
               }}>
-              Save Progress &amp; Return to Dashboard
+              Save &amp; Return to Dashboard
             </button>
             {initialUploaded >= INITIAL_REQUIRED.length && (
               <p className="text-center" style={{ fontSize: 12, color: "var(--gelbgrun)", fontWeight: 600 }}>

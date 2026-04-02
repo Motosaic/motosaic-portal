@@ -15,7 +15,7 @@ const STEPS = [
 
 type FormData = {
   // Step 1
-  email: string; address: string; city: string; state: string; zip: string;
+  firstName: string; lastName: string; address: string; city: string; state: string; zip: string;
   // Step 2
   purchaseType: string; budget: string; downPayment: string;
   monthlyPayment: string; annualMileage: string; creditScore: string; timeframe: string;
@@ -29,7 +29,7 @@ type FormData = {
 };
 
 const initial: FormData = {
-  email: "", address: "", city: "", state: "", zip: "",
+  firstName: "", lastName: "", address: "", city: "", state: "", zip: "",
   purchaseType: "finance", budget: "", downPayment: "",
   monthlyPayment: "", annualMileage: "", creditScore: "", timeframe: "",
   bodyStyles: [], preferredMakes: [], preferredModels: "",
@@ -131,6 +131,66 @@ function MultiSelect({ options, value, onChange }: { options: string[]; value: s
   );
 }
 
+// Tri-state makes picker: 0=neutral, 1=preferred (green), -1=not interested (red)
+type MakeState = Record<string, 1 | -1 | 0>;
+
+function TriStateMakes({ makes, state, onChange }: {
+  makes: string[];
+  state: MakeState;
+  onChange: (s: MakeState) => void;
+}) {
+  const cycle = (make: string) => {
+    const cur = state[make] ?? 0;
+    const next: 1 | -1 | 0 = cur === 0 ? 1 : cur === 1 ? -1 : 0;
+    onChange({ ...state, [make]: next });
+  };
+  return (
+    <div className="flex flex-wrap gap-2 mt-1">
+      {makes.map(make => {
+        const s = state[make] ?? 0;
+        const isPreferred = s === 1;
+        const isNo = s === -1;
+        return (
+          <button
+            key={make}
+            type="button"
+            onClick={() => cycle(make)}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150"
+            style={{
+              background: isPreferred
+                ? "rgba(20,200,80,0.18)"
+                : isNo
+                ? "rgba(220,60,60,0.18)"
+                : "rgba(255,255,255,0.07)",
+              color: isPreferred
+                ? "#4ade80"
+                : isNo
+                ? "#f87171"
+                : "rgba(255,255,255,0.65)",
+              border: `1px solid ${
+                isPreferred
+                  ? "rgba(20,200,80,0.45)"
+                  : isNo
+                  ? "rgba(220,60,60,0.45)"
+                  : "rgba(255,255,255,0.1)"
+              }`,
+              fontFamily: "Industry, sans-serif",
+            }}
+          >
+            {isPreferred ? "✓ " : isNo ? "✕ " : ""}{make}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function formatCurrency(raw: string): string {
+  const digits = raw.replace(/[^0-9]/g, "");
+  if (!digits) return "";
+  return "$" + Number(digits).toLocaleString("en-US");
+}
+
 function ToggleGroup({ options, value, onChange, testPrefix }: {
   options: [string, string][];
   value: string;
@@ -162,6 +222,7 @@ export default function IntakePage() {
   const { id: clientId } = useParams<{ id: string }>();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormData>(initial);
+  const [makesState, setMakesState] = useState<MakeState>({});
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
@@ -174,10 +235,29 @@ export default function IntakePage() {
       return res.json();
     },
     enabled: !!clientId,
+    // Pre-populate name from login data when client loads
+    staleTime: 30000,
   });
+
+  // Pre-populate firstName/lastName from existing client record when first loaded
+  const [namePrefilled, setNamePrefilled] = useState(false);
+  if (existingClient && !namePrefilled) {
+    if (existingClient.firstName || existingClient.lastName) {
+      setForm(prev => ({
+        ...prev,
+        firstName: prev.firstName || existingClient.firstName || "",
+        lastName: prev.lastName || existingClient.lastName || "",
+      }));
+    }
+    setNamePrefilled(true);
+  }
 
   const set = (field: keyof FormData, value: unknown) =>
     setForm(prev => ({ ...prev, [field]: value }));
+
+  // Derive preferred/not-interested from tri-state
+  const preferredMakes = Object.entries(makesState).filter(([,v]) => v === 1).map(([k]) => k);
+  const notInterestedMakes = Object.entries(makesState).filter(([,v]) => v === -1).map(([k]) => k);
 
   // Save questionnaire and mark complete
   const mutation = useMutation({
@@ -185,7 +265,8 @@ export default function IntakePage() {
       const payload = {
         ...data,
         bodyStyles: JSON.stringify(data.bodyStyles),
-        preferredMakes: JSON.stringify(data.preferredMakes),
+        preferredMakes: JSON.stringify(preferredMakes),
+        notInterestedMakes: JSON.stringify(notInterestedMakes),
         exteriorColors: JSON.stringify(data.exteriorColors),
         interiorColors: JSON.stringify(data.interiorColors),
       };
@@ -209,7 +290,8 @@ export default function IntakePage() {
     const payload = {
       ...data,
       bodyStyles: JSON.stringify(data.bodyStyles),
-      preferredMakes: JSON.stringify(data.preferredMakes),
+      preferredMakes: JSON.stringify(preferredMakes),
+      notInterestedMakes: JSON.stringify(notInterestedMakes),
       exteriorColors: JSON.stringify(data.exteriorColors),
       interiorColors: JSON.stringify(data.interiorColors),
     };
@@ -283,10 +365,30 @@ export default function IntakePage() {
             {/* ── Step 1: Contact & Registration Address ── */}
             {step === 0 && (
               <div className="flex flex-col gap-5">
-                <Field label="Email Address">
-                  <input className="intake-input" type="email" placeholder="you@example.com" value={form.email}
-                    onChange={e => set("email", e.target.value)} data-testid="input-email" />
-                </Field>
+                <FieldRow>
+                  <Field label="First Name">
+                    <input className="intake-input" placeholder="Mike" value={form.firstName}
+                      onChange={e => set("firstName", e.target.value)} data-testid="input-first-name" />
+                  </Field>
+                  <Field label="Last Name">
+                    <input className="intake-input" placeholder="Calcara" value={form.lastName}
+                      onChange={e => set("lastName", e.target.value)} data-testid="input-last-name" />
+                  </Field>
+                </FieldRow>
+                {existingClient && (
+                  <FieldRow>
+                    <Field label="Email Address">
+                      <div className="intake-input flex items-center" style={{ opacity: 0.65, cursor: "default", background: "rgba(255,255,255,0.04)" }}>
+                        {existingClient.email}
+                      </div>
+                    </Field>
+                    <Field label="Phone Number">
+                      <div className="intake-input flex items-center" style={{ opacity: 0.65, cursor: "default", background: "rgba(255,255,255,0.04)" }}>
+                        {existingClient.phone}
+                      </div>
+                    </Field>
+                  </FieldRow>
+                )}
                 <Field label="Registration Address" hint="where the vehicle will be registered">
                   <input className="intake-input" placeholder="123 Main St" value={form.address}
                     onChange={e => set("address", e.target.value)} data-testid="input-address" />
@@ -331,11 +433,15 @@ export default function IntakePage() {
                     <FieldRow>
                       <Field label="Total Budget">
                         <input className="intake-input" placeholder="$35,000" value={form.budget}
-                          onChange={e => set("budget", e.target.value)} data-testid="input-budget" />
+                          onChange={e => set("budget", e.target.value)}
+                          onBlur={e => set("budget", formatCurrency(e.target.value))}
+                          data-testid="input-budget" />
                       </Field>
                       <Field label="Down Payment">
                         <input className="intake-input" placeholder="$5,000" value={form.downPayment}
-                          onChange={e => set("downPayment", e.target.value)} data-testid="input-down-payment" />
+                          onChange={e => set("downPayment", e.target.value)}
+                          onBlur={e => set("downPayment", formatCurrency(e.target.value))}
+                          data-testid="input-down-payment" />
                       </Field>
                     </FieldRow>
                     <Field label="Purchase Timeframe *">
@@ -353,11 +459,15 @@ export default function IntakePage() {
                     <FieldRow>
                       <Field label="Total Budget">
                         <input className="intake-input" placeholder="$35,000" value={form.budget}
-                          onChange={e => set("budget", e.target.value)} data-testid="input-budget" />
+                          onChange={e => set("budget", e.target.value)}
+                          onBlur={e => set("budget", formatCurrency(e.target.value))}
+                          data-testid="input-budget" />
                       </Field>
                       <Field label="Down Payment">
                         <input className="intake-input" placeholder="$5,000" value={form.downPayment}
-                          onChange={e => set("downPayment", e.target.value)} data-testid="input-down-payment" />
+                          onChange={e => set("downPayment", e.target.value)}
+                          onBlur={e => set("downPayment", formatCurrency(e.target.value))}
+                          data-testid="input-down-payment" />
                       </Field>
                     </FieldRow>
                     <FieldRow>
@@ -383,11 +493,15 @@ export default function IntakePage() {
                     <FieldRow>
                       <Field label="Target Monthly Payment">
                         <input className="intake-input" placeholder="$499/mo" value={form.monthlyPayment}
-                          onChange={e => set("monthlyPayment", e.target.value)} data-testid="input-monthly" />
+                          onChange={e => set("monthlyPayment", e.target.value)}
+                          onBlur={e => set("monthlyPayment", formatCurrency(e.target.value))}
+                          data-testid="input-monthly" />
                       </Field>
                       <Field label="Down Payment">
                         <input className="intake-input" placeholder="$2,000" value={form.downPayment}
-                          onChange={e => set("downPayment", e.target.value)} data-testid="input-down-payment" />
+                          onChange={e => set("downPayment", e.target.value)}
+                          onBlur={e => set("downPayment", formatCurrency(e.target.value))}
+                          data-testid="input-down-payment" />
                       </Field>
                     </FieldRow>
                     <Field label="How many miles do you drive per year?">
@@ -421,8 +535,11 @@ export default function IntakePage() {
                 <Field label="Body Style (select all that apply)">
                   <MultiSelect options={BODY_STYLES} value={form.bodyStyles} onChange={v => set("bodyStyles", v)} />
                 </Field>
-                <Field label="Preferred Makes (select all that apply)">
-                  <MultiSelect options={MAKES} value={form.preferredMakes} onChange={v => set("preferredMakes", v)} />
+                <Field label="Preferred Makes" hint="just a starting point — doesn't have to be your final list">
+                  <p style={{ fontSize: 11, color: "rgba(255,255,255,0.38)", marginTop: 4, marginBottom: 6 }}>
+                    Tap once for ✓ preferred (green) · tap again for ✕ not interested (red) · tap again to clear
+                  </p>
+                  <TriStateMakes makes={MAKES} state={makesState} onChange={setMakesState} />
                 </Field>
                 <Field label="Specific Models in Mind">
                   <input className="intake-input" placeholder="e.g. RAV4, F-150, 3 Series..." value={form.preferredModels}

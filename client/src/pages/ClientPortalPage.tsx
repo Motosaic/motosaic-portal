@@ -186,7 +186,7 @@ function ProgressHub({ session, onReset }: { session: ClientSession; onReset: ()
             className="hover:text-white transition-colors"
             data-testid="btn-logout"
           >
-            ← Switch
+            Log Out
           </button>
         </div>
       </header>
