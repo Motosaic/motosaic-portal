@@ -5,6 +5,8 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Document } from "@shared/schema";
+import { isUATSession } from "@/lib/uat";
+import { UATToolbar } from "@/components/UATToolbar";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -150,7 +152,7 @@ function LoginScreen({ onLogin }: { onLogin: (session: ClientSession) => void })
 
 // ─── Progress Hub ─────────────────────────────────────────────────────────────
 
-function ProgressHub({ session, onReset }: { session: ClientSession; onReset: () => void }) {
+function ProgressHub({ session, onReset, isUAT }: { session: ClientSession; onReset: () => void; isUAT: boolean }) {
   const [, navigate] = useLocation();
 
   const { data: docs = [] } = useQuery<Document[]>({
@@ -280,6 +282,9 @@ function ProgressHub({ session, onReset }: { session: ClientSession; onReset: ()
           )}
         </div>
       </main>
+
+      {/* UAT floating toolbar */}
+      {isUAT && <UATToolbar clientId={session.id} current="portal" />}
     </div>
   );
 }
@@ -381,6 +386,7 @@ let _cachedSession: ClientSession | null = null;
 
 export default function ClientPortalPage() {
   const [session, setSession] = useState<ClientSession | null>(_cachedSession);
+  const isUAT = session ? isUATSession(session.email, session.phone) : false;
 
   const handleLogin = (s: ClientSession) => {
     _cachedSession = s;
@@ -400,6 +406,7 @@ export default function ClientPortalPage() {
     <ProgressHub
       session={session}
       onReset={handleLogout}
+      isUAT={isUAT}
     />
   );
 }

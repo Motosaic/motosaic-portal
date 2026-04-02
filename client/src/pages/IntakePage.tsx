@@ -5,6 +5,8 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Client } from "@shared/schema";
+import { isUATSession } from "@/lib/uat";
+import { UATToolbar } from "@/components/UATToolbar";
 
 const STEPS = [
   { label: "Personal", icon: "👤" },
@@ -538,6 +540,7 @@ export default function IntakePage() {
   };
 
   const validateStep = () => {
+    if (isUAT) return true; // UAT mode — skip all validation
     if (step === 0) return true;
     if (step === 1) {
       if (!form.purchaseType) return false;
@@ -569,6 +572,7 @@ export default function IntakePage() {
   const isCash = form.purchaseType === "cash";
   const isLease = form.purchaseType === "lease";
   const isFinance = form.purchaseType === "finance";
+  const isUAT = existingClient ? isUATSession(existingClient.email ?? "", existingClient.phone ?? "") : false;
   const hasSUV = form.bodyStyles.includes("SUV");
 
   const clientName = existingClient
@@ -1129,6 +1133,9 @@ export default function IntakePage() {
           </p>
         </div>
       </main>
+
+      {/* UAT floating toolbar */}
+      {isUAT && <UATToolbar clientId={clientId} current="intake" />}
 
       {/* ── Mobile sticky bottom navigation bar ── */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 px-4 py-3"

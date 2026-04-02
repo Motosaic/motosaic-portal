@@ -5,6 +5,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Document, Client } from "@shared/schema";
+import { isUATSession } from "@/lib/uat";
+import { UATToolbar } from "@/components/UATToolbar";
 
 // ─── Document type definitions ───────────────────────────────────────────────
 
@@ -251,6 +253,7 @@ export default function UploadPage() {
   const totalRequired    = INITIAL_REQUIRED.length + POST_REQUIRED.length;
 
   const clientName = client ? `${client.firstName} ${client.lastName}` : "";
+  const isUAT = client ? isUATSession(client.email ?? "", client.phone ?? "") : false;
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(160deg, #002639 0%, #004363 60%, #003552 100%)" }}>
@@ -447,6 +450,9 @@ export default function UploadPage() {
           </p>
         </div>
       </main>
+
+      {/* UAT floating toolbar */}
+      {isUAT && <UATToolbar clientId={clientId} current="documents" />}
 
       {/* ── Mobile sticky bottom bar ── */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 px-4 py-3"
