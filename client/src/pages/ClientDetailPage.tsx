@@ -526,7 +526,56 @@ export default function ClientDetailPage() {
               </SectionCard>
             </div>
 
-            {/* Vehicle wish list */}
+            {/* Document checklist */}
+            <SectionCard title="Documents" icon={
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <polyline points="9 15 11 17 15 13"/>
+              </svg>
+            }>
+              {(() => {
+                const docChecklist = [
+                  { key: "drivers_license_front", label: "DL — Front" },
+                  { key: "drivers_license_back",  label: "DL — Back" },
+                  { key: "proof_of_insurance",    label: "Current Insurance" },
+                  { key: "insurance_id_card",     label: "Updated Insurance" },
+                ];
+                return (
+                  <div className="flex flex-col gap-2">
+                    {docChecklist.map(({ key, label }) => {
+                      const uploaded = docs.some(d => d.docType === key);
+                      return (
+                        <div key={key} className="flex items-center gap-2.5 rounded-lg px-3 py-2"
+                          style={{ background: uploaded ? "rgba(173,240,41,0.07)" : "rgba(255,255,255,0.04)", border: `1px solid ${uploaded ? "rgba(173,240,41,0.2)" : "rgba(255,255,255,0.08)"}` }}>
+                          <div className="flex-shrink-0 rounded-full flex items-center justify-center"
+                            style={{ width: 20, height: 20, background: uploaded ? "rgba(173,240,41,0.2)" : "rgba(255,255,255,0.08)" }}>
+                            {uploaded ? (
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#ADF029" strokeWidth="3">
+                                <polyline points="20 6 9 17 4 12"/>
+                              </svg>
+                            ) : (
+                              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="2.5">
+                                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                              </svg>
+                            )}
+                          </div>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: uploaded ? "rgba(173,240,41,0.9)" : "rgba(255,255,255,0.4)" }}>
+                            {label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", marginTop: 4, textAlign: "right" }}>
+                      {docs.filter(d => ["drivers_license_front","drivers_license_back","proof_of_insurance","insurance_id_card"].includes(d.docType)).length} / 4 uploaded
+                    </p>
+                  </div>
+                );
+              })()}
+            </SectionCard>
+
+            {/* Vehicle wish list — full width */}
+            <div className="col-span-3">
             <SectionCard title="What They Want" icon={
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 1 1 4.93 19.07"/>
@@ -563,6 +612,7 @@ export default function ClientDetailPage() {
                 )}
               </div>
             </SectionCard>
+            </div>
           </div>
 
           {/* ── 3. FINAL DEAL BUILD ── */}
