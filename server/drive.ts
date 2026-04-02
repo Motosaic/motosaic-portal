@@ -14,19 +14,39 @@ import type { Client, Document } from "@shared/schema";
 // ─── OAuth2 Client ────────────────────────────────────────────────────────────
 
 export function getOAuthClient() {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    const missing = [
+      !clientId && "GOOGLE_CLIENT_ID",
+      !clientSecret && "GOOGLE_CLIENT_SECRET",
+      !refreshToken && "GOOGLE_REFRESH_TOKEN",
+    ].filter(Boolean).join(", ");
+    throw new Error(`Missing Google OAuth env vars: ${missing}`);
+  }
+
   const client = new google.auth.OAuth2(
+    clientId,
+    clientSecret,
+    "https://portal.motosaic.com/auth/google/callback"
+  );
+  client.setCredentials({ refresh_token: refreshToken });
+  return client;
+}
+
+// Auth URL doesn't need a refresh token — creates a bare client for the consent flow
+function getAuthOnlyClient() {
+  return new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
     "https://portal.motosaic.com/auth/google/callback"
   );
-  if (process.env.GOOGLE_REFRESH_TOKEN) {
-    client.setCredentials({ refresh_token: process.env.GOOGLE_REFRESH_TOKEN });
-  }
-  return client;
 }
 
 export function getAuthUrl(): string {
-  const client = getOAuthClient();
+  const client = getAuthOnlyClient();
   return client.generateAuthUrl({
     access_type: "offline",
     prompt: "consent",
@@ -35,7 +55,7 @@ export function getAuthUrl(): string {
 }
 
 export async function exchangeCodeForTokens(code: string): Promise<string> {
-  const client = getOAuthClient();
+  const client = getAuthOnlyClient();
   const { tokens } = await client.getToken(code);
   return tokens.refresh_token || "";
 }

@@ -114,6 +114,11 @@ export default function AdminDashboard() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/clients"] }),
   });
 
+  const reseedMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/admin/reseed", {}),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/clients"] }),
+  });
+
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   if (!unlocked) return <AdminPasswordGate onUnlock={() => setUnlocked(true)} />;
@@ -187,14 +192,29 @@ export default function AdminDashboard() {
               {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
             </p>
           </div>
-          <button onClick={() => navigate("/intake")} data-testid="btn-new-client"
-            className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-all hover:opacity-90"
-            style={{ background: "var(--miami-blue)", color: "var(--shelby-blue)", fontFamily: "Industry, sans-serif" }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            New Client
-          </button>
+          <div className="flex items-center gap-3">
+            {clients.length === 0 && (
+              <button
+                onClick={() => reseedMutation.mutate()}
+                disabled={reseedMutation.isPending}
+                data-testid="btn-seed-clients"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-all hover:opacity-90"
+                style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.7)", fontFamily: "Industry, sans-serif", border: "1px solid rgba(255,255,255,0.15)" }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/>
+                </svg>
+                {reseedMutation.isPending ? "Seeding..." : "Seed Example Clients"}
+              </button>
+            )}
+            <button onClick={() => navigate("/intake")} data-testid="btn-new-client"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-all hover:opacity-90"
+              style={{ background: "var(--miami-blue)", color: "var(--shelby-blue)", fontFamily: "Industry, sans-serif" }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              New Client
+            </button>
+          </div>
         </header>
 
         <div className="flex-1 overflow-y-auto px-8 py-6">

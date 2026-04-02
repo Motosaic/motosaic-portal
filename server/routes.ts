@@ -54,6 +54,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Debug: check what env vars the server actually sees (safe – only shows key presence)
+  app.get("/api/debug/env", (_req, res) => {
+    res.json({
+      NODE_ENV: process.env.NODE_ENV,
+      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ? `set (${process.env.GOOGLE_CLIENT_ID.slice(0, 12)}...)` : "MISSING",
+      GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET ? `set (${process.env.GOOGLE_CLIENT_SECRET.slice(0, 8)}...)` : "MISSING",
+      GOOGLE_REFRESH_TOKEN: process.env.GOOGLE_REFRESH_TOKEN ? `set (${process.env.GOOGLE_REFRESH_TOKEN.slice(0, 12)}...)` : "MISSING",
+      DB_PATH: process.env.DB_PATH || "not set",
+      UPLOADS_DIR: process.env.UPLOADS_DIR || "not set",
+      PORT: process.env.PORT || "not set",
+    });
+  });
+
   // Manual sync trigger (admin use)
   app.post("/api/clients/:id/sync-drive", async (req, res) => {
     const id = parseInt(req.params.id);
@@ -66,6 +79,116 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.json({ folderUrl });
     } catch (err) {
       res.status(500).json({ message: "Drive sync failed", error: String(err) });
+    }
+  });
+
+  // Reseed example clients (admin use — skips if they already exist)
+  app.post("/api/admin/reseed", (_req, res) => {
+    try {
+      const existing = storage.getClients();
+      // Only seed if fewer than 4 clients (avoid duplicating real clients)
+      if (existing.length >= 4) {
+        return res.json({ message: "Database already has clients — skipping reseed", count: existing.length });
+      }
+      const examples = [
+        {
+          firstName: "James", lastName: "Thornton",
+          email: "james.thornton@email.com", phone: "(312) 555-0191",
+          address: "842 Lakeview Dr", city: "Chicago", state: "IL", zip: "60614",
+          purchaseType: "finance", budget: "$85,000", downPayment: "$15,000",
+          monthlyPayment: "$1,200", annualMileage: "12,000", creditScore: "740",
+          timeframe: "Within 30 days",
+          bodyStyles: JSON.stringify(["SUV"]),
+          preferredMakes: JSON.stringify(["BMW", "Mercedes-Benz", "Audi"]),
+          preferredModels: "X5, GLE, Q7",
+          mustHaveFeatures: "Panoramic sunroof, heated seats, adaptive cruise",
+          niceToHaveFeatures: "Massaging seats, head-up display",
+          exteriorColors: "Alpine White or Mineral White",
+          interiorColors: JSON.stringify(["Black", "Cognac"]),
+          hasTradeIn: true,
+          tradeYear: "2019", tradeMake: "BMW", tradeModel: "X3", tradeTrim: "xDrive30i",
+          tradeMileage: "41,200", tradeCondition: "Good", tradeOwed: "$0",
+          questionnaireComplete: true,
+          assignedTo: "mike_calcara",
+          finalMake: "BMW", finalModel: "X5", finalTrim: "xDrive40i",
+          finalExtColor: "Alpine White", finalIntColor: "Cognac Leather",
+          finalOptions: "M Sport Package, Panoramic Sky Lounge, Harman Kardon",
+          finalZip: "60614",
+          status: "in_progress",
+          notes: "Client is flexible on color. Has pre-approval from Chase at 5.9%.",
+        },
+        {
+          firstName: "Sarah", lastName: "Delgado",
+          email: "sarah.delgado@email.com", phone: "(305) 555-0284",
+          address: "2201 Biscayne Blvd", city: "Miami", state: "FL", zip: "33137",
+          purchaseType: "lease", budget: "$70,000", downPayment: "$5,000",
+          monthlyPayment: "$850", annualMileage: "10,000", creditScore: "780",
+          timeframe: "Within 60 days",
+          bodyStyles: JSON.stringify(["Sedan", "Coupe"]),
+          preferredMakes: JSON.stringify(["Porsche", "Mercedes-Benz", "Lexus"]),
+          preferredModels: "Cayenne, GLC, NX",
+          mustHaveFeatures: "Ventilated seats, wireless CarPlay",
+          niceToHaveFeatures: "Burmester audio, 360 camera",
+          exteriorColors: "Black or dark grey",
+          interiorColors: JSON.stringify(["Cream", "Beige"]),
+          hasTradeIn: false,
+          questionnaireComplete: false,
+          assignedTo: "mike_calcara",
+          status: "new",
+          notes: "First-time lease client. Referred by James Thornton.",
+        },
+        {
+          firstName: "Derek", lastName: "Okafor",
+          email: "derek.okafor@email.com", phone: "(713) 555-0347",
+          address: "5500 Kirby Dr", city: "Houston", state: "TX", zip: "77005",
+          purchaseType: "cash", budget: "$180,000", downPayment: "$180,000",
+          timeframe: "ASAP",
+          bodyStyles: JSON.stringify(["Coupe", "Convertible"]),
+          preferredMakes: JSON.stringify(["Porsche", "Ferrari", "Lamborghini"]),
+          preferredModels: "911, Roma, Huracán",
+          mustHaveFeatures: "Sport exhaust, rear-wheel drive",
+          niceToHaveFeatures: "Carbon ceramic brakes, sport chrono",
+          exteriorColors: "Racing Yellow or GT Silver",
+          interiorColors: JSON.stringify(["Black", "Club leather"]),
+          hasTradeIn: true,
+          tradeYear: "2021", tradeMake: "Porsche", tradeModel: "911", tradeTrim: "Carrera S",
+          tradeMileage: "8,400", tradeCondition: "Excellent", tradeOwed: "$0",
+          questionnaireComplete: true,
+          assignedTo: "mike_calcara",
+          finalMake: "Porsche", finalModel: "911", finalTrim: "GT3",
+          finalExtColor: "Racing Yellow", finalIntColor: "Black w/ yellow stitching",
+          finalOptions: "Clubsport Package, Lift System, BOSE",
+          finalZip: "77005",
+          status: "in_progress",
+          notes: "Has GT3 Touring on allocation at Porsche of Houston. Needs to confirm color.",
+        },
+        {
+          firstName: "Monica", lastName: "Reyes",
+          email: "monica.reyes@email.com", phone: "(424) 555-0462",
+          address: "1200 Wilshire Blvd", city: "Los Angeles", state: "CA", zip: "90025",
+          purchaseType: "finance", budget: "$55,000", downPayment: "$10,000",
+          monthlyPayment: "$900", annualMileage: "15,000", creditScore: "700",
+          timeframe: "1-3 months",
+          bodyStyles: JSON.stringify(["SUV", "Crossover"]),
+          preferredMakes: JSON.stringify(["Toyota", "Honda", "Subaru"]),
+          preferredModels: "RAV4, CR-V, Outback",
+          mustHaveFeatures: "All-wheel drive, Apple CarPlay, safety suite",
+          exteriorColors: "Silver or Blue",
+          interiorColors: JSON.stringify(["Gray", "Black"]),
+          hasTradeIn: false,
+          questionnaireComplete: false,
+          status: "new",
+          notes: "Budget-conscious, practical driver. No specific brand loyalty.",
+        },
+      ];
+      let count = 0;
+      for (const ex of examples) {
+        storage.createClient(ex as any);
+        count++;
+      }
+      res.json({ message: `Seeded ${count} example clients`, count });
+    } catch (err) {
+      res.status(500).json({ message: "Reseed failed", error: String(err) });
     }
   });
 
