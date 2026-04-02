@@ -6,6 +6,7 @@ import fs from "fs";
 import { storage } from "./storage";
 import { insertClientSchema, insertDocumentSchema } from "@shared/schema";
 import { z } from "zod";
+import { getAuthUrl, exchangeCodeForTokens, syncClientToDrive } from "./drive";
 
 const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(process.cwd(), "uploads");
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -20,6 +21,54 @@ const upload = multer({
 });
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<void> {
+
+  // ─── Google OAuth ────────────────────────────────────────────────────────
+
+  // Step 1: Redirect admin to Google consent screen
+  app.get("/auth/google", (_req, res) => {
+    const url = getAuthUrl();
+    res.redirect(url);
+  });
+
+  // Step 2: Google redirects back here with a code
+  app.get("/auth/google/callback", async (req, res) => {
+    const code = req.query.code as string;
+    if (!code) return res.status(400).send("Missing code");
+    try {
+      const refreshToken = await exchangeCodeForTokens(code);
+      if (!refreshToken) {
+        return res.send(`<h2>Auth succeeded but no refresh token returned.</h2><p>Try visiting <a href="/auth/google">/auth/google</a> again — make sure to click 'Allow'.</p>`);
+      }
+      res.send(`
+        <html><body style="font-family:monospace;padding:40px;background:#001f30;color:#1FC3EF">
+          <h2 style="color:#ADF029">✓ Google Drive Connected!</h2>
+          <p>Copy this refresh token and add it as a Render environment variable:</p>
+          <p><strong>Key:</strong> GOOGLE_REFRESH_TOKEN</p>
+          <p><strong>Value:</strong></p>
+          <textarea rows="4" style="width:100%;background:#002639;color:#1FC3EF;border:1px solid #1FC3EF;padding:8px;font-size:12px">${refreshToken}</textarea>
+          <p style="color:rgba(255,255,255,0.5);font-size:12px">After adding to Render and redeploying, Drive sync will be fully automatic.</p>
+        </body></html>
+      `);
+    } catch (err) {
+      res.status(500).send(`Auth error: ${String(err)}`);
+    }
+  });
+
+  // Manual sync trigger (admin use)
+  app.post("/api/clients/:id/sync-drive", async (req, res) => {
+    const id = parseInt(req.params.id);
+    const client = storage.getClient(id);
+    if (!client) return res.status(404).json({ message: "Client not found" });
+    try {
+      const docs = storage.getDocumentsByClient(id);
+      const folderUrl = await syncClientToDrive(client, docs, UPLOADS_DIR);
+      storage.updateClientDriveFolder(id, folderUrl);
+      res.json({ folderUrl });
+    } catch (err) {
+      res.status(500).json({ message: "Drive sync failed", error: String(err) });
+    }
+  });
+
   // ─── Clients ────────────────────────────────────────────────────────────
 
   app.get("/api/clients", (_req, res) => {
@@ -146,12 +195,22 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(updated);
   });
 
-  // Mark questionnaire complete
-  app.post("/api/clients/:id/questionnaire-complete", (req, res) => {
+  // Mark questionnaire complete + auto-sync to Drive
+  app.post("/api/clients/:id/questionnaire-complete", async (req, res) => {
     const id = parseInt(req.params.id);
     const client = storage.markQuestionnaireComplete(id);
     if (!client) return res.status(404).json({ message: "Client not found" });
     res.json(client);
+    // Fire-and-forget Drive sync (don't block the response)
+    if (process.env.GOOGLE_REFRESH_TOKEN) {
+      try {
+        const docs = storage.getDocumentsByClient(id);
+        const folderUrl = await syncClientToDrive(client, docs, UPLOADS_DIR);
+        storage.updateClientDriveFolder(id, folderUrl);
+      } catch (err) {
+        console.error("Drive sync failed:", err);
+      }
+    }
   });
 
   // ─── Documents ──────────────────────────────────────────────────────────
@@ -162,7 +221,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(docs);
   });
 
-  app.post("/api/clients/:id/documents", upload.single("file"), (req, res) => {
+  app.post("/api/clients/:id/documents", upload.single("file"), async (req, res) => {
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
     const clientId = parseInt(req.params.id);
     const { docType } = req.body;
@@ -176,6 +235,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       fileSize: req.file.size,
     });
     res.status(201).json(doc);
+    // Mirror to Drive if connected
+    if (process.env.GOOGLE_REFRESH_TOKEN) {
+      const client = storage.getClient(clientId);
+      if (client?.questionnaireComplete) {
+        try {
+          const allDocs = storage.getDocumentsByClient(clientId);
+          const folderUrl = await syncClientToDrive(client, allDocs, UPLOADS_DIR);
+          storage.updateClientDriveFolder(clientId, folderUrl);
+        } catch (err) {
+          console.error("Drive doc sync failed:", err);
+        }
+      }
+    }
   });
 
   // Public intake form submission — still supported for backwards compat
