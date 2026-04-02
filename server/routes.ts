@@ -192,6 +192,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // All doc types grouped by clientId — used by admin dashboard for at-a-glance status
+  app.get("/api/documents/all", (_req, res) => {
+    const docs = storage.getAllDocuments();
+    // Return map: { [clientId]: string[] } of uploaded docTypes
+    const map: Record<number, string[]> = {};
+    for (const doc of docs) {
+      if (!map[doc.clientId]) map[doc.clientId] = [];
+      map[doc.clientId].push(doc.docType);
+    }
+    res.json(map);
+  });
+
   // ─── Clients ────────────────────────────────────────────────────────────
 
   app.get("/api/clients", (_req, res) => {

@@ -102,6 +102,7 @@ export interface IStorage {
   deleteClient(id: number): void;
   // Documents
   getDocumentsByClient(clientId: number): schema.Document[];
+  getAllDocuments(): schema.Document[];
   createDocument(data: schema.InsertDocument): schema.Document;
   deleteDocument(id: number): void;
 }
@@ -186,6 +187,10 @@ export class Storage implements IStorage {
 
   getDocumentsByClient(clientId: number): schema.Document[] {
     return db.select().from(schema.documents).where(eq(schema.documents.clientId, clientId)).all();
+  }
+
+  getAllDocuments(): schema.Document[] {
+    return db.select().from(schema.documents).all();
   }
 
   createDocument(data: schema.InsertDocument): schema.Document {

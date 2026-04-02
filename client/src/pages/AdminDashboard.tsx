@@ -119,6 +119,10 @@ export default function AdminDashboard() {
     queryKey: ["/api/clients"],
   });
 
+  const { data: docMap = {} } = useQuery<Record<number, string[]>>({
+    queryKey: ["/api/documents/all"],
+  });
+
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) =>
       apiRequest("PATCH", `/api/clients/${id}/status`, { status }),
@@ -350,6 +354,34 @@ export default function AdminDashboard() {
                       {client.purchaseType && (
                         <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", textTransform: "capitalize" }}>{client.purchaseType}</p>
                       )}
+                    </div>
+
+                    {/* Doc checklist pills */}
+                    <div className="hidden lg:flex items-center gap-1.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                      {[
+                        { key: "drivers_license_front", short: "DL Front" },
+                        { key: "drivers_license_back",  short: "DL Back" },
+                        { key: "proof_of_insurance",    short: "Insurance" },
+                        { key: "insurance_id_card",     short: "Updated Ins." },
+                      ].map(({ key, short }) => {
+                        const done = (docMap[client.id] || []).includes(key);
+                        return (
+                          <span key={key} className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold"
+                            style={{
+                              background: done ? "rgba(173,240,41,0.1)" : "rgba(255,255,255,0.05)",
+                              color: done ? "#ADF029" : "rgba(255,255,255,0.25)",
+                              border: `1px solid ${done ? "rgba(173,240,41,0.25)" : "rgba(255,255,255,0.08)"}`,
+                              fontFamily: "Industry, sans-serif",
+                            }}>
+                            {done ? (
+                              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#ADF029" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+                            ) : (
+                              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            )}
+                            {short}
+                          </span>
+                        );
+                      })}
                     </div>
 
                     {/* Status dropdown */}
