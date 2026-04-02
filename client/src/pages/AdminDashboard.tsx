@@ -5,19 +5,21 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { Client } from "@shared/schema";
 
-const ADMIN_PASSWORD = "Admin";
+const ADMIN_USERNAME = "Admin";
+const ADMIN_PASSWORD = "AdminMotosaic";
 
 function AdminPasswordGate({ onUnlock }: { onUnlock: () => void }) {
-  const [input, setInput] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (input === ADMIN_PASSWORD) {
+    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
       onUnlock();
     } else {
       setError(true);
-      setInput("");
+      setPassword("");
       setTimeout(() => setError(false), 2000);
     }
   };
@@ -32,19 +34,30 @@ function AdminPasswordGate({ onUnlock }: { onUnlock: () => void }) {
         <div className="rounded-2xl p-8" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
           <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--miami-blue)", marginBottom: 8 }}>Admin Access</p>
           <h2 style={{ fontSize: 22, fontWeight: 900, color: "white", marginBottom: 24 }}>Dashboard Login</h2>
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} autoComplete="on">
+            <label className="intake-label">Username</label>
+            <input
+              type="text"
+              className="intake-input mb-4"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              placeholder="Username"
+              autoComplete="username"
+              autoFocus
+              style={error ? { borderColor: "#ef4444" } : {}}
+            />
             <label className="intake-label">Password</label>
             <input
               type="password"
               className="intake-input"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              placeholder="Enter admin password"
-              autoFocus
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="Password"
+              autoComplete="current-password"
               style={error ? { borderColor: "#ef4444" } : {}}
             />
             {error && (
-              <p style={{ color: "#ef4444", fontSize: 13, marginTop: 8 }}>Incorrect password. Try again.</p>
+              <p style={{ color: "#ef4444", fontSize: 13, marginTop: 8 }}>Incorrect credentials. Try again.</p>
             )}
             <button
               type="submit"
