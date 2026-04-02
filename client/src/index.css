@@ -1,0 +1,245 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Industry Font Face ─────────────────────────────────────────────────── */
+@font-face { font-family: 'Industry'; src: url('/fonts/Industry-Thin.otf') format('opentype'); font-weight: 100; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Industry'; src: url('/fonts/Industry-ThinItalic.otf') format('opentype'); font-weight: 100; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Industry'; src: url('/fonts/Industry-Light.otf') format('opentype'); font-weight: 300; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Industry'; src: url('/fonts/Industry-LightItalic.otf') format('opentype'); font-weight: 300; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Industry'; src: url('/fonts/Industry-Book.otf') format('opentype'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Industry'; src: url('/fonts/Industry-Bold.otf') format('opentype'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Industry'; src: url('/fonts/Industry-BoldItalic.otf') format('opentype'); font-weight: 700; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Industry'; src: url('/fonts/Industry-DemiItalic.otf') format('opentype'); font-weight: 600; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Industry'; src: url('/fonts/Industry-MediumItalic.otf') format('opentype'); font-weight: 500; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Industry'; src: url('/fonts/Industry-Black.otf') format('opentype'); font-weight: 900; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Industry'; src: url('/fonts/Industry-BlackItalic.otf') format('opentype'); font-weight: 900; font-style: italic; font-display: swap; }
+
+/* ─── Motosaic Brand Tokens ──────────────────────────────────────────────── */
+:root {
+  /* Motosaic Colors */
+  --shelby-blue: #004363;       /* Primary — deep navy */
+  --miami-blue: #1FC3EF;        /* Secondary — sky blue */
+  --sao-paulo: #F2EA00;         /* Accent — yellow-green */
+  --gelbgrun: #ADF029;          /* Alt accent — lime */
+  --nardo: #E1F3F5;             /* Neutral light */
+  --shelby-light: #0184B0;      /* Mid blue */
+  --pure-black: #010202;
+  --white: #ffffff;
+
+  /* Semantic roles — light mode */
+  --background: 196 100% 13%;   /* Shelby Blue deep */
+  --foreground: 0 0% 98%;
+
+  --card: 199 96% 13%;
+  --card-foreground: 0 0% 98%;
+
+  --popover: 199 96% 13%;
+  --popover-foreground: 0 0% 98%;
+
+  --primary: 193 87% 53%;       /* Miami Blue */
+  --primary-foreground: 199 100% 8%;
+
+  --secondary: 196 35% 22%;
+  --secondary-foreground: 0 0% 98%;
+
+  --muted: 196 30% 18%;
+  --muted-foreground: 196 20% 65%;
+
+  --accent: 58 88% 96%;         /* São Paulo yellow-tinted */
+  --accent-foreground: 199 100% 12%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+
+  --border: 196 30% 25%;
+  --input: 196 30% 22%;
+  --ring: 193 87% 53%;
+
+  --radius: 0.5rem;
+}
+
+/* Light mode for client intake portal */
+.light-portal {
+  --background: 196 60% 97%;
+  --foreground: 199 100% 13%;
+  --card: 0 0% 100%;
+  --card-foreground: 199 100% 13%;
+  --border: 196 30% 85%;
+  --input: 196 20% 92%;
+  --muted: 196 20% 95%;
+  --muted-foreground: 196 20% 45%;
+  --primary: 199 100% 20%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 196 40% 90%;
+  --secondary-foreground: 199 100% 15%;
+}
+
+/* ─── Base Reset ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  scroll-behavior: smooth;
+}
+body {
+  font-family: 'Industry', 'Helvetica Neue', sans-serif;
+  font-weight: 400;
+  line-height: 1.6;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+/* ─── Motosaic Utility Classes ───────────────────────────────────────────── */
+.text-miami { color: var(--miami-blue); }
+.text-sao-paulo { color: var(--sao-paulo); }
+.text-shelby { color: var(--shelby-blue); }
+.bg-shelby { background-color: var(--shelby-blue); }
+.bg-miami { background-color: var(--miami-blue); }
+.bg-sao-paulo { background-color: var(--sao-paulo); }
+.bg-nardo { background-color: var(--nardo); }
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--shelby-light); border-radius: 3px; }
+
+/* ─── Focus ring ─────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--miami-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ─── Step progress ──────────────────────────────────────────────────────── */
+.step-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.step-indicator .step {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  border: 2px solid rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.5);
+  background: transparent;
+  transition: all 0.2s ease;
+}
+.step-indicator .step.active {
+  background: var(--miami-blue);
+  border-color: var(--miami-blue);
+  color: white;
+}
+.step-indicator .step.done {
+  background: var(--gelbgrun);
+  border-color: var(--gelbgrun);
+  color: var(--shelby-blue);
+}
+.step-indicator .step-line {
+  flex: 1;
+  height: 2px;
+  background: rgba(255,255,255,0.15);
+  min-width: 24px;
+}
+.step-indicator .step-line.done {
+  background: var(--gelbgrun);
+}
+
+/* ─── Card hover ─────────────────────────────────────────────────────────── */
+.client-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.client-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+}
+
+/* ─── Status badges ──────────────────────────────────────────────────────── */
+.badge-new { background: rgba(31,195,239,0.15); color: var(--miami-blue); border: 1px solid rgba(31,195,239,0.3); }
+.badge-in_progress { background: rgba(242,234,0,0.15); color: #e8d800; border: 1px solid rgba(242,234,0,0.3); }
+.badge-ready { background: rgba(173,240,41,0.15); color: var(--gelbgrun); border: 1px solid rgba(173,240,41,0.3); }
+.badge-closed { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.45); border: 1px solid rgba(255,255,255,0.12); }
+
+/* ─── Upload drop zone ───────────────────────────────────────────────────── */
+.drop-zone {
+  border: 2px dashed rgba(31,195,239,0.35);
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+.drop-zone:hover, .drop-zone.drag-over {
+  border-color: var(--miami-blue);
+  background: rgba(31,195,239,0.06);
+}
+
+/* ─── Sidebar ────────────────────────────────────────────────────────────── */
+.sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.6);
+  text-decoration: none;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+.sidebar-nav-item:hover {
+  background: rgba(255,255,255,0.07);
+  color: rgba(255,255,255,0.9);
+}
+.sidebar-nav-item.active {
+  background: rgba(31,195,239,0.15);
+  color: var(--miami-blue);
+}
+
+/* ─── Form field overrides ───────────────────────────────────────────────── */
+.intake-input {
+  background: rgba(255,255,255,0.09);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.95);
+  border-radius: 8px;
+  padding: 11px 14px;
+  font-family: 'Industry', sans-serif;
+  font-size: 15px;
+  width: 100%;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.intake-input:focus {
+  outline: none;
+  border-color: var(--miami-blue);
+  background: rgba(31,195,239,0.08);
+}
+.intake-input::placeholder { color: rgba(255,255,255,0.4); }
+.intake-input option { background: #004363; color: white; }
+
+.intake-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.7);
+  margin-bottom: 6px;
+  display: block;
+}
+
+/* ─── Animations ─────────────────────────────────────────────────────────── */
+@keyframes fadeSlideUp {
+  from { opacity: 0.6; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-in { animation: fadeSlideUp 0.15s ease forwards; }
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(31,195,239,0.3); }
+  50% { box-shadow: 0 0 0 8px rgba(31,195,239,0); }
+}
+.pulse-glow { animation: pulse-glow 2s infinite; }

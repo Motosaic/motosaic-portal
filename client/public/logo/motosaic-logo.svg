@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" fill="none">
+  <!-- M mark: three wave-arcs -->
+  <!-- Top row: sky blue arcs -->
+  <path d="M10 55 Q10 10 55 10 Q100 10 100 55" fill="#1FC3EF"/>
+  <path d="M55 55 Q55 10 100 10 Q145 10 145 55" fill="#1FC3EF"/>
+  <path d="M100 55 Q100 10 145 10 Q185 10 185 55" fill="#1FC3EF"/>
+  <!-- Divider line -->
+  <rect x="10" y="54" width="175" height="5" fill="white"/>
+  <!-- Bottom row: dark navy arcs (inverted) -->
+  <path d="M10 57 Q10 100 50 100 Q90 100 90 57" fill="#004363"/>
+  <path d="M60 57 Q60 100 100 100 Q140 100 140 57" fill="#004363"/>
+  <path d="M115 57 Q115 100 150 100 Q185 100 185 57" fill="#004363"/>
+  <!-- Star accent -->
+  <path d="M195 38 L198 30 L201 38 L209 41 L201 44 L198 52 L195 44 L187 41 Z" fill="#ADF029"/>
+  <!-- MOTOSAIC text -->
+  <text x="220" y="75" font-family="Industry, Arial, sans-serif" font-weight="700" font-size="38" letter-spacing="4" fill="#004363">MOTOSAIC</text>
+</svg>
