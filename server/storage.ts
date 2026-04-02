@@ -75,6 +75,16 @@ addColumnIfMissing("clients", "annual_mileage", "TEXT");
 addColumnIfMissing("clients", "exterior_colors", "TEXT");
 addColumnIfMissing("clients", "interior_colors", "TEXT");
 addColumnIfMissing("clients", "questionnaire_complete", "INTEGER DEFAULT 0");
+// Deal builder columns
+addColumnIfMissing("clients", "assigned_to", "TEXT");
+addColumnIfMissing("clients", "final_make", "TEXT");
+addColumnIfMissing("clients", "final_model", "TEXT");
+addColumnIfMissing("clients", "final_trim", "TEXT");
+addColumnIfMissing("clients", "final_ext_color", "TEXT");
+addColumnIfMissing("clients", "final_int_color", "TEXT");
+addColumnIfMissing("clients", "final_options", "TEXT");
+addColumnIfMissing("clients", "final_zip", "TEXT");
+addColumnIfMissing("clients", "final_deal_notes", "TEXT");
 
 export interface IStorage {
   // Clients
@@ -183,6 +193,23 @@ export class Storage implements IStorage {
 
   deleteDocument(id: number): void {
     db.delete(schema.documents).where(eq(schema.documents.id, id)).run();
+  }
+
+  updateClientAssignment(id: number, assignedTo: string | null): schema.Client | undefined {
+    return db.update(schema.clients).set({ assignedTo }).where(eq(schema.clients.id, id)).returning().get();
+  }
+
+  updateClientDealBuild(id: number, data: {
+    finalMake?: string;
+    finalModel?: string;
+    finalTrim?: string;
+    finalExtColor?: string;
+    finalIntColor?: string;
+    finalOptions?: string;
+    finalZip?: string;
+    finalDealNotes?: string;
+  }): schema.Client | undefined {
+    return db.update(schema.clients).set(data).where(eq(schema.clients.id, id)).returning().get();
   }
 }
 

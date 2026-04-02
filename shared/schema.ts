@@ -41,6 +41,17 @@ export const clients = sqliteTable("clients", {
   tradeOwed: text("trade_owed"),
   // Progress tracking
   questionnaireComplete: integer("questionnaire_complete", { mode: "boolean" }).default(false),
+  // Deal Assignment
+  assignedTo: text("assigned_to"), // "mike_minerva" | "mike_standen" | null
+  // Final Vehicle Build (filled in by admin, sent to sourcing partner)
+  finalMake: text("final_make"),
+  finalModel: text("final_model"),
+  finalTrim: text("final_trim"),
+  finalExtColor: text("final_ext_color"),
+  finalIntColor: text("final_int_color"),
+  finalOptions: text("final_options"),   // must-have options/config notes
+  finalZip: text("final_zip"),           // shipping zip
+  finalDealNotes: text("final_deal_notes"), // internal deal notes for sourcing
   // Meta
   status: text("status").default("new"), // new | in_progress | ready | closed
   notes: text("notes"),

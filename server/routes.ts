@@ -60,6 +60,32 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(client);
   });
 
+  app.patch("/api/clients/:id/assigned-to", (req, res) => {
+    const id = parseInt(req.params.id);
+    const { assignedTo } = z.object({ assignedTo: z.string().nullable() }).parse(req.body);
+    const client = storage.updateClientAssignment(id, assignedTo);
+    if (!client) return res.status(404).json({ message: "Client not found" });
+    res.json(client);
+  });
+
+  app.patch("/api/clients/:id/deal-build", (req, res) => {
+    const id = parseInt(req.params.id);
+    const schema = z.object({
+      finalMake: z.string().optional(),
+      finalModel: z.string().optional(),
+      finalTrim: z.string().optional(),
+      finalExtColor: z.string().optional(),
+      finalIntColor: z.string().optional(),
+      finalOptions: z.string().optional(),
+      finalZip: z.string().optional(),
+      finalDealNotes: z.string().optional(),
+    });
+    const data = schema.parse(req.body);
+    const client = storage.updateClientDealBuild(id, data);
+    if (!client) return res.status(404).json({ message: "Client not found" });
+    res.json(client);
+  });
+
   app.patch("/api/clients/:id/drive-folder", (req, res) => {
     const id = parseInt(req.params.id);
     const { driveFolder } = z.object({ driveFolder: z.string() }).parse(req.body);

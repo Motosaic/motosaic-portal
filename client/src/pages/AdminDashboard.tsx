@@ -60,6 +60,11 @@ function AdminPasswordGate({ onUnlock }: { onUnlock: () => void }) {
   );
 }
 
+const AGENTS: Record<string, { label: string; color: string }> = {
+  mike_standen:  { label: "Mike S",  color: "#1FC3EF" },
+  mike_minerva:  { label: "Mike M",  color: "#ADF029" },
+};
+
 const STATUS_OPTIONS = ["new", "in_progress", "ready", "closed"];
 const STATUS_LABELS: Record<string, string> = {
   new: "New",
@@ -269,6 +274,18 @@ export default function AdminDashboard() {
                           {client.firstName} {client.lastName}
                         </span>
                         <StatusBadge status={client.status || "new"} />
+                        {client.assignedTo && AGENTS[client.assignedTo] && (
+                          <span className="px-2 py-0.5 rounded-full text-xs font-bold"
+                            style={{ background: `${AGENTS[client.assignedTo].color}22`, color: AGENTS[client.assignedTo].color, border: `1px solid ${AGENTS[client.assignedTo].color}44` }}>
+                            {AGENTS[client.assignedTo].label}
+                          </span>
+                        )}
+                        {client.finalMake && (
+                          <span className="px-2 py-0.5 rounded-full text-xs font-bold"
+                            style={{ background: "rgba(242,234,0,0.1)", color: "#F2EA00", border: "1px solid rgba(242,234,0,0.2)" }}>
+                            {client.finalMake} {client.finalModel}
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-4 mt-1 flex-wrap">
                         <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>{client.email}</span>
