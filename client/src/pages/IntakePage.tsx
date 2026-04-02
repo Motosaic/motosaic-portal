@@ -176,51 +176,163 @@ function MultiSelect({ options, value, onChange }: { options: string[]; value: s
   );
 }
 
-// Chip selector for must-have / nice-to-have features
-function FeatureChips({
-  chips, selected, onChange, otherValue, onOtherChange, testPrefix,
+// Unified tri-state feature chip selector
+// State: 0 = neutral, 1 = nice-to-have (blue), 2 = must-have (green)
+type FeatureState = Record<string, 0 | 1 | 2>;
+
+function TriStateFeatureChips({
+  chips, state, onChange, otherValue, onOtherChange,
 }: {
   chips: string[];
-  selected: string[];
-  onChange: (v: string[]) => void;
+  state: FeatureState;
+  onChange: (s: FeatureState) => void;
   otherValue: string;
   onOtherChange: (v: string) => void;
-  testPrefix: string;
 }) {
-  const toggle = (chip: string) =>
-    onChange(selected.includes(chip) ? selected.filter(x => x !== chip) : [...selected, chip]);
+  const cycle = (chip: string) => {
+    const cur = state[chip] ?? 0;
+    const next: 0 | 1 | 2 = cur === 0 ? 1 : cur === 1 ? 2 : 0;
+    onChange({ ...state, [chip]: next });
+  };
+
+  const niceToHave = chips.filter(c => (state[c] ?? 0) === 1);
+  const mustHave   = chips.filter(c => (state[c] ?? 0) === 2);
+
+  // Also include "other" text as a virtual entry in the nice-to-have list preview
+  const hasSelections = niceToHave.length > 0 || mustHave.length > 0;
 
   return (
     <div>
-      <div className="flex flex-wrap gap-2 mt-1">
-        {chips.map(chip => (
-          <button
-            key={chip}
-            type="button"
-            onClick={() => toggle(chip)}
-            className="px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150"
-            style={{
-              background: selected.includes(chip) ? "var(--miami-blue)" : "rgba(255,255,255,0.07)",
-              color: selected.includes(chip) ? "var(--shelby-blue)" : "rgba(255,255,255,0.75)",
-              border: `1px solid ${selected.includes(chip) ? "var(--miami-blue)" : "rgba(255,255,255,0.12)"}`,
-              fontFamily: "Industry, sans-serif",
-              minHeight: 40,
-            }}
-            data-testid={`chip-${testPrefix}-${chip.replace(/\W+/g, "_")}`}
-          >
-            {selected.includes(chip) ? "✓ " : ""}{chip}
-          </button>
-        ))}
+      {/* Hint */}
+      <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 4, marginBottom: 8, lineHeight: 1.5 }}>
+        Tap once for{" "}
+        <span style={{ color: "var(--miami-blue)", fontWeight: 700 }}>Nice to Have</span>
+        {" "}· tap again for{" "}
+        <span style={{ color: "var(--gelbgrun)", fontWeight: 700 }}>Must Have</span>
+        {" "}· tap a third time to clear.
+      </p>
+
+      {/* Chip grid */}
+      <div className="flex flex-wrap gap-2">
+        {chips.map(chip => {
+          const s = state[chip] ?? 0;
+          const isNice = s === 1;
+          const isMust = s === 2;
+          return (
+            <button
+              key={chip}
+              type="button"
+              onClick={() => cycle(chip)}
+              className="px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-95"
+              style={{
+                background: isMust
+                  ? "rgba(173,240,41,0.15)"
+                  : isNice
+                  ? "rgba(31,195,239,0.15)"
+                  : "rgba(255,255,255,0.07)",
+                color: isMust
+                  ? "var(--gelbgrun)"
+                  : isNice
+                  ? "var(--miami-blue)"
+                  : "rgba(255,255,255,0.75)",
+                border: `1px solid ${
+                  isMust
+                    ? "rgba(173,240,41,0.35)"
+                    : isNice
+                    ? "rgba(31,195,239,0.35)"
+                    : "rgba(255,255,255,0.12)"
+                }`,
+                fontFamily: "Industry, sans-serif",
+                minHeight: 40,
+              }}
+              data-testid={`chip-feature-${chip.replace(/\W+/g, "_")}`}
+            >
+              {isMust ? "★ " : isNice ? "✓ " : ""}{chip}
+            </button>
+          );
+        })}
       </div>
-      <div className="mt-2">
+
+      {/* Other text input */}
+      <div className="mt-3">
         <input
           className="intake-input"
           placeholder="Other (type anything else...)"
           value={otherValue}
           onChange={e => onOtherChange(e.target.value)}
-          data-testid={`input-${testPrefix}-other`}
+          data-testid="input-feature-other"
         />
       </div>
+
+      {/* Dynamic selection list */}
+      {hasSelections && (
+        <div className="mt-4 rounded-xl p-4 flex flex-col gap-3"
+          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+            Your Selection
+          </p>
+
+          {mustHave.length > 0 && (
+            <div>
+              <p style={{ fontSize: 11, fontWeight: 700, color: "var(--gelbgrun)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                ★ Must Have
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {mustHave.map(chip => (
+                  <span
+                    key={chip}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold"
+                    style={{
+                      background: "rgba(173,240,41,0.12)",
+                      color: "var(--gelbgrun)",
+                      border: "1px solid rgba(173,240,41,0.3)",
+                      fontFamily: "Industry, sans-serif",
+                    }}
+                  >
+                    {chip}
+                    <button
+                      type="button"
+                      onClick={() => onChange({ ...state, [chip]: 0 })}
+                      style={{ color: "rgba(173,240,41,0.55)", fontSize: 14, lineHeight: 1 }}
+                      className="hover:opacity-100 opacity-70 transition-opacity"
+                    >×</button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {niceToHave.length > 0 && (
+            <div>
+              <p style={{ fontSize: 11, fontWeight: 700, color: "var(--miami-blue)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                ✓ Nice to Have
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {niceToHave.map(chip => (
+                  <span
+                    key={chip}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold"
+                    style={{
+                      background: "rgba(31,195,239,0.1)",
+                      color: "var(--miami-blue)",
+                      border: "1px solid rgba(31,195,239,0.25)",
+                      fontFamily: "Industry, sans-serif",
+                    }}
+                  >
+                    {chip}
+                    <button
+                      type="button"
+                      onClick={() => onChange({ ...state, [chip]: 0 })}
+                      style={{ color: "rgba(31,195,239,0.55)", fontSize: 14, lineHeight: 1 }}
+                      className="hover:opacity-100 opacity-70 transition-opacity"
+                    >×</button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -333,11 +445,10 @@ export default function IntakePage() {
   const [form, setForm] = useState<FormData>(initial);
   const [makesState, setMakesState] = useState<MakeState>({});
 
-  // Chip selections for must-have and nice-to-have (separate from free-text "other")
-  const [mustHaveChips, setMustHaveChips] = useState<string[]>([]);
-  const [mustHaveOther, setMustHaveOther] = useState("");
-  const [niceToHaveChips, setNiceToHaveChips] = useState<string[]>([]);
-  const [niceToHaveOther, setNiceToHaveOther] = useState("");
+  // Unified feature chip tri-state (0=neutral, 1=nice-to-have, 2=must-have)
+  type FeatureState = Record<string, 0 | 1 | 2>;
+  const [featureState, setFeatureState] = useState<FeatureState>({});
+  const [featureOther, setFeatureOther] = useState("");
 
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -374,11 +485,13 @@ export default function IntakePage() {
   const preferredMakes = Object.entries(makesState).filter(([,v]) => v === 1).map(([k]) => k);
   const notInterestedMakes = Object.entries(makesState).filter(([,v]) => v === -1).map(([k]) => k);
 
-  // Build comma-separated feature strings from chips + other text
+  // Derive must-have and nice-to-have strings from unified featureState
+  const allChips = [...MUST_HAVE_CHIPS, ...NICE_TO_HAVE_CHIPS.filter(c => !MUST_HAVE_CHIPS.includes(c))];
+  const mustHaveFromState  = allChips.filter(c => (featureState[c] ?? 0) === 2);
+  const niceToHaveFromState = allChips.filter(c => (featureState[c] ?? 0) === 1);
   const buildFeatureString = (chips: string[], other: string): string => {
     const parts = [...chips];
-    const otherTrimmed = other.trim();
-    if (otherTrimmed) parts.push(otherTrimmed);
+    if (other.trim()) parts.push(other.trim());
     return parts.join(", ");
   };
 
@@ -393,8 +506,8 @@ export default function IntakePage() {
         exteriorColors: JSON.stringify(data.exteriorColors),
         interiorColors: JSON.stringify(data.interiorColors),
         householdVehicles: JSON.stringify(data.householdVehicles),
-        mustHaveFeatures: buildFeatureString(mustHaveChips, mustHaveOther),
-        niceToHaveFeatures: buildFeatureString(niceToHaveChips, niceToHaveOther),
+        mustHaveFeatures: buildFeatureString(mustHaveFromState, featureOther),
+        niceToHaveFeatures: buildFeatureString(niceToHaveFromState, ""),
       };
       await apiRequest("PATCH", `/api/clients/${clientId}/questionnaire`, payload);
       const res = await apiRequest("POST", `/api/clients/${clientId}/questionnaire-complete`);
@@ -418,8 +531,8 @@ export default function IntakePage() {
       exteriorColors: JSON.stringify(data.exteriorColors),
       interiorColors: JSON.stringify(data.interiorColors),
       householdVehicles: JSON.stringify(data.householdVehicles),
-      mustHaveFeatures: buildFeatureString(mustHaveChips, mustHaveOther),
-      niceToHaveFeatures: buildFeatureString(niceToHaveChips, niceToHaveOther),
+      mustHaveFeatures: buildFeatureString(mustHaveFromState, featureOther),
+      niceToHaveFeatures: buildFeatureString(niceToHaveFromState, ""),
     };
     apiRequest("PATCH", `/api/clients/${clientId}/questionnaire`, payload).catch(() => {});
   };
@@ -881,35 +994,15 @@ export default function IntakePage() {
                     onChange={e => set("preferredModels", e.target.value)} data-testid="input-models" />
                 </Field>
 
-                {/* Must-have features chips */}
+                {/* Unified feature chip selector */}
                 <div>
-                  <label className="intake-label">Must-Have Features</label>
-                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 4, marginBottom: 2, lineHeight: 1.5 }}>
-                    Tap to select — these are deal-breakers we'll prioritize.
-                  </p>
-                  <FeatureChips
+                  <label className="intake-label">Features That Matter to You</label>
+                  <TriStateFeatureChips
                     chips={MUST_HAVE_CHIPS}
-                    selected={mustHaveChips}
-                    onChange={setMustHaveChips}
-                    otherValue={mustHaveOther}
-                    onOtherChange={setMustHaveOther}
-                    testPrefix="must-have"
-                  />
-                </div>
-
-                {/* Nice-to-have features chips */}
-                <div>
-                  <label className="intake-label">Nice-to-Have Features</label>
-                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 4, marginBottom: 2, lineHeight: 1.5 }}>
-                    Would love these but won't walk away without them.
-                  </p>
-                  <FeatureChips
-                    chips={NICE_TO_HAVE_CHIPS}
-                    selected={niceToHaveChips}
-                    onChange={setNiceToHaveChips}
-                    otherValue={niceToHaveOther}
-                    onOtherChange={setNiceToHaveOther}
-                    testPrefix="nice-to-have"
+                    state={featureState}
+                    onChange={setFeatureState}
+                    otherValue={featureOther}
+                    onOtherChange={setFeatureOther}
                   />
                 </div>
 
