@@ -370,17 +370,30 @@ function StepCard({
 
 // ─── Main export: routes based on session state ───────────────────────────────
 
+// Module-level session cache — persists across back-button navigation within the same tab
+let _cachedSession: ClientSession | null = null;
+
 export default function ClientPortalPage() {
-  const [session, setSession] = useState<ClientSession | null>(null);
+  const [session, setSession] = useState<ClientSession | null>(_cachedSession);
+
+  const handleLogin = (s: ClientSession) => {
+    _cachedSession = s;
+    setSession(s);
+  };
+
+  const handleLogout = () => {
+    _cachedSession = null;
+    setSession(null);
+  };
 
   if (!session) {
-    return <LoginScreen onLogin={setSession} />;
+    return <LoginScreen onLogin={handleLogin} />;
   }
 
   return (
     <ProgressHub
       session={session}
-      onReset={() => setSession(null)}
+      onReset={handleLogout}
     />
   );
 }

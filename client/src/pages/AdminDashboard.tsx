@@ -92,8 +92,11 @@ function StatCard({ label, value, sub }: { label: string; value: number; sub?: s
   );
 }
 
+// Module-level unlock cache — persists across back-button navigation within the same tab
+let _adminUnlocked = false;
+
 export default function AdminDashboard() {
-  const [unlocked, setUnlocked] = useState(false);
+  const [unlocked, setUnlocked] = useState(_adminUnlocked);
   const [, navigate] = useLocation();
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -121,7 +124,7 @@ export default function AdminDashboard() {
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
-  if (!unlocked) return <AdminPasswordGate onUnlock={() => setUnlocked(true)} />;
+  if (!unlocked) return <AdminPasswordGate onUnlock={() => { _adminUnlocked = true; setUnlocked(true); }} />;
 
   const filtered = clients.filter(c => {
     const q = search.toLowerCase();
