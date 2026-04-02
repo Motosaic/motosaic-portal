@@ -63,21 +63,21 @@ function LoginScreen({ onLogin }: { onLogin: (session: ClientSession) => void })
       </div>
 
       <div className="relative z-10 w-full animate-in" style={{ maxWidth: 460 }}>
-        <div className="flex justify-center mb-10">
-          <MotoLogoFull height={48} />
+        <div className="flex justify-center mb-8 md:mb-10">
+          <MotoLogoFull height={44} />
         </div>
 
         <p className="text-center mb-2" style={{ color: "var(--miami-blue)", fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase" }}>
           Client Portal
         </p>
-        <h1 className="text-center mb-3" style={{ fontSize: 28, fontWeight: 900, color: "white", lineHeight: 1.2 }}>
+        <h1 className="text-center mb-3" style={{ fontSize: 26, fontWeight: 900, color: "white", lineHeight: 1.2 }}>
           Welcome
         </h1>
-        <p className="text-center mb-8" style={{ fontSize: 15, color: "rgba(255,255,255,0.75)", lineHeight: 1.65 }}>
+        <p className="text-center mb-6 md:mb-8" style={{ fontSize: 14, color: "rgba(255,255,255,0.75)", lineHeight: 1.65, padding: "0 8px" }}>
           Enter your email and phone number to access your onboarding progress or start a new application.
         </p>
 
-        <div className="rounded-2xl p-8 flex flex-col gap-5"
+        <div className="rounded-2xl p-5 md:p-8 flex flex-col gap-4 md:gap-5"
           style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.14)" }}>
 
           <div>
@@ -85,6 +85,9 @@ function LoginScreen({ onLogin }: { onLogin: (session: ClientSession) => void })
             <input
               className="intake-input"
               type="email"
+              inputMode="email"
+              autoCapitalize="none"
+              autoCorrect="off"
               placeholder="you@example.com"
               value={email}
               onChange={e => setEmail(e.target.value)}
@@ -97,6 +100,7 @@ function LoginScreen({ onLogin }: { onLogin: (session: ClientSession) => void })
             <input
               className="intake-input"
               type="tel"
+              inputMode="tel"
               placeholder="(704) 555-0100"
               value={phone}
               onChange={e => setPhone(formatPhone(e.target.value))}
@@ -121,20 +125,21 @@ function LoginScreen({ onLogin }: { onLogin: (session: ClientSession) => void })
             onClick={() => mutation.mutate()}
             disabled={!canSubmit || mutation.isPending}
             data-testid="btn-login"
-            className="w-full py-4 rounded-xl font-bold transition-all hover:opacity-90 active:scale-95 disabled:opacity-40"
+            className="w-full rounded-xl font-bold transition-all hover:opacity-90 active:scale-95 disabled:opacity-40"
             style={{
               background: "var(--miami-blue)",
               color: "var(--shelby-blue)",
               fontSize: 16,
               fontFamily: "Industry, sans-serif",
               marginTop: 4,
+              minHeight: 52,
             }}
           >
             {mutation.isPending ? "Loading..." : "Access My Portal →"}
           </button>
         </div>
 
-        <p className="text-center mt-6" style={{ fontSize: 13, color: "rgba(255,255,255,0.45)" }}>
+        <p className="text-center mt-5 md:mt-6" style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", padding: "0 8px" }}>
           New client? Enter your details to get started.
           Returning? Use the same email &amp; phone to pick up where you left off.
         </p>
@@ -172,13 +177,12 @@ function ProgressHub({ session, onReset }: { session: ClientSession; onReset: ()
       style={{ background: "linear-gradient(160deg, #002639 0%, #004363 60%, #003552 100%)" }}
     >
       {/* Header */}
-      <header className="flex items-center justify-between px-8 py-5 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
-        <MotoLogoFull height={36} />
-        <div className="flex items-center gap-5">
+      <header className="flex items-center justify-between px-4 md:px-8 py-4 md:py-5 border-b flex-shrink-0" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+        <MotoLogoFull height={30} />
+        <div className="flex items-center gap-3 md:gap-5">
           <div className="text-right">
             <p style={{ fontSize: 13, fontWeight: 700, color: "white" }}>{session.firstName} {session.lastName}</p>
-            {session.email && <p style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{session.email}</p>}
-            {session.phone && <p style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{session.phone}</p>}
+            <p className="hidden sm:block" style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{session.email}</p>
           </div>
           <button
             onClick={onReset}
@@ -191,15 +195,15 @@ function ProgressHub({ session, onReset }: { session: ClientSession; onReset: ()
         </div>
       </header>
 
-      <main className="flex-1 flex items-start justify-center px-4 py-12">
+      <main className="flex-1 flex items-start justify-center px-4 py-8 md:py-12">
         <div className="w-full animate-in" style={{ maxWidth: 600 }}>
 
           {/* Greeting */}
-          <div className="mb-8">
+          <div className="mb-6 md:mb-8">
             <p style={{ color: "var(--miami-blue)", fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 6 }}>
               Your Progress
             </p>
-            <h1 style={{ fontSize: 26, fontWeight: 900, color: "white", marginBottom: 8 }}>
+            <h1 style={{ fontSize: 24, fontWeight: 900, color: "white", marginBottom: 8 }}>
               Welcome back, {session.firstName}.
             </h1>
             <p style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>
@@ -212,7 +216,7 @@ function ProgressHub({ session, onReset }: { session: ClientSession; onReset: ()
           </div>
 
           {/* Overall progress bar */}
-          <div className="mb-8">
+          <div className="mb-6 md:mb-8">
             <div className="flex justify-between mb-2">
               <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>Overall Progress</span>
               <span style={{ fontSize: 12, color: "var(--miami-blue)", fontWeight: 700 }}>
@@ -231,7 +235,7 @@ function ProgressHub({ session, onReset }: { session: ClientSession; onReset: ()
           </div>
 
           {/* Step cards */}
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3 md:gap-4">
             {/* Card 1: Questionnaire */}
             <StepCard
               number={1}
@@ -245,7 +249,7 @@ function ProgressHub({ session, onReset }: { session: ClientSession; onReset: ()
               testId="card-questionnaire"
             />
 
-            {/* Card 2: Document Upload — always unlocked */}
+            {/* Card 2: Document Upload */}
             <StepCard
               number={2}
               title="Document Upload"
@@ -263,7 +267,7 @@ function ProgressHub({ session, onReset }: { session: ClientSession; onReset: ()
 
           {/* All done state */}
           {qComplete && docsComplete && (
-            <div className="mt-6 rounded-2xl p-6 text-center"
+            <div className="mt-5 md:mt-6 rounded-2xl p-5 md:p-6 text-center"
               style={{ background: "rgba(173,240,41,0.07)", border: "1px solid rgba(173,240,41,0.2)" }}>
               <p style={{ fontSize: 22, marginBottom: 8 }}>🎉</p>
               <p style={{ fontWeight: 700, color: "var(--gelbgrun)", fontSize: 15, marginBottom: 4 }}>
@@ -295,7 +299,7 @@ function StepCard({
 }) {
   return (
     <div
-      className="rounded-2xl p-6 flex items-center gap-5 transition-all"
+      className="rounded-2xl p-4 md:p-6 flex items-center gap-4 md:gap-5 transition-all"
       style={{
         background: locked ? "rgba(255,255,255,0.025)" : complete ? "rgba(173,240,41,0.05)" : "rgba(255,255,255,0.05)",
         border: `1px solid ${locked ? "rgba(255,255,255,0.06)" : complete ? "rgba(173,240,41,0.2)" : "rgba(31,195,239,0.2)"}`,
@@ -305,30 +309,30 @@ function StepCard({
     >
       {/* Step number / check */}
       <div
-        className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center"
+        className="flex-shrink-0 w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center"
         style={{
           background: complete ? "rgba(173,240,41,0.15)" : locked ? "rgba(255,255,255,0.05)" : "rgba(31,195,239,0.12)",
           border: `1.5px solid ${complete ? "var(--gelbgrun)" : locked ? "rgba(255,255,255,0.1)" : "var(--miami-blue)"}`,
         }}
       >
         {complete ? (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gelbgrun)" strokeWidth="2.5">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gelbgrun)" strokeWidth="2.5">
             <polyline points="20 6 9 17 4 12" />
           </svg>
         ) : locked ? (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
         ) : (
-          <span style={{ fontWeight: 900, color: "var(--miami-blue)", fontSize: 16, fontFamily: "Industry, sans-serif" }}>{number}</span>
+          <span style={{ fontWeight: 900, color: "var(--miami-blue)", fontSize: 15, fontFamily: "Industry, sans-serif" }}>{number}</span>
         )}
       </div>
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <span style={{ fontWeight: 700, fontSize: 15, color: locked ? "rgba(255,255,255,0.55)" : "white" }}>{title}</span>
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
+          <span style={{ fontWeight: 700, fontSize: 14, color: locked ? "rgba(255,255,255,0.55)" : "white" }}>{title}</span>
           {complete && (
             <span className="px-2 py-0.5 rounded-full text-xs font-bold"
               style={{ background: "rgba(173,240,41,0.15)", color: "var(--gelbgrun)", border: "1px solid rgba(173,240,41,0.3)" }}>
@@ -342,7 +346,7 @@ function StepCard({
             </span>
           )}
         </div>
-        <p style={{ fontSize: 13, color: locked ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.55)", marginBottom: 4 }}>{description}</p>
+        <p style={{ fontSize: 12, color: locked ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.55)", marginBottom: 3 }}>{description}</p>
         <p style={{ fontSize: 11, color: complete ? "var(--gelbgrun)" : locked ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.45)", fontWeight: 600 }}>{detail}</p>
       </div>
 
@@ -351,14 +355,16 @@ function StepCard({
         <button
           onClick={onCta}
           data-testid={`btn-${testId}`}
-          className="flex-shrink-0 px-5 py-2.5 rounded-xl font-bold text-sm transition-all hover:opacity-85 active:scale-95"
+          className="flex-shrink-0 rounded-xl font-bold text-sm transition-all hover:opacity-85 active:scale-95"
           style={{
             background: complete ? "rgba(255,255,255,0.08)" : "var(--miami-blue)",
             color: complete ? "rgba(255,255,255,0.6)" : "var(--shelby-blue)",
             border: complete ? "1px solid rgba(255,255,255,0.1)" : "none",
             fontFamily: "Industry, sans-serif",
-            fontSize: 13,
+            fontSize: 12,
             whiteSpace: "nowrap",
+            minHeight: 40,
+            padding: "8px 14px",
           }}
         >
           {ctaLabel}

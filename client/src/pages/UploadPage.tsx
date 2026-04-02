@@ -58,7 +58,6 @@ const DOC_SECTIONS = [
   },
 ];
 
-// Flat list of all doc types for required counting
 const ALL_DOCS = DOC_SECTIONS.flatMap(s => s.docs);
 const INITIAL_REQUIRED = ALL_DOCS.filter(d => d.required && d.phase === "initial");
 const POST_REQUIRED    = ALL_DOCS.filter(d => d.required && d.phase === "post_purchase");
@@ -69,11 +68,12 @@ function formatBytes(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// ─── Drop Zone ────────────────────────────────────────────────────────────────
+// ─── Upload Zone (mobile-first: camera + file picker) ────────────────────────
 
 function DropZone({ docType, clientId, onUploaded }: { docType: string; clientId: string; onUploaded: () => void }) {
   const [isDragging, setIsDragging] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
 
@@ -104,40 +104,108 @@ function DropZone({ docType, clientId, onUploaded }: { docType: string; clientId
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) uploadFile(file);
+    // Reset so same file can be re-selected
+    e.target.value = "";
   };
 
+  if (uploading) {
+    return (
+      <div className="drop-zone p-5 flex flex-col items-center justify-center gap-2">
+        <div className="w-6 h-6 border-2 rounded-full animate-spin"
+          style={{ borderColor: "var(--miami-blue)", borderTopColor: "transparent" }} />
+        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>Uploading...</p>
+      </div>
+    );
+  }
+
   return (
-    <div
-      className={`drop-zone p-5 text-center cursor-pointer transition-all ${isDragging ? "drag-over" : ""}`}
-      onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
-      onDragLeave={() => setIsDragging(false)}
-      onDrop={handleDrop}
-      onClick={() => inputRef.current?.click()}
-      data-testid={`drop-zone-${docType}`}
-    >
-      <input ref={inputRef} type="file" className="hidden" accept="image/*,application/pdf"
-        onChange={handleChange} data-testid={`input-file-${docType}`} />
-      {uploading ? (
-        <div className="flex flex-col items-center gap-2">
-          <div className="w-5 h-5 border-2 rounded-full animate-spin"
-            style={{ borderColor: "var(--miami-blue)", borderTopColor: "transparent" }} />
-          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>Uploading...</p>
-        </div>
-      ) : (
-        <>
-          <svg className="mx-auto mb-1.5" width="20" height="20" viewBox="0 0 24 24" fill="none"
-            stroke="var(--miami-blue)" strokeWidth="1.5">
+    <div>
+      {/* Hidden inputs */}
+      {/* Camera capture — mobile only */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        className="hidden"
+        accept="image/*"
+        capture="environment"
+        onChange={handleChange}
+        data-testid={`input-camera-${docType}`}
+      />
+      {/* File picker — camera + files */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="hidden"
+        accept="image/*,application/pdf"
+        onChange={handleChange}
+        data-testid={`input-file-${docType}`}
+      />
+
+      {/* Mobile: two big tap buttons */}
+      <div className="flex gap-2 md:hidden">
+        <button
+          type="button"
+          onClick={() => cameraInputRef.current?.click()}
+          className="flex-1 flex flex-col items-center justify-center gap-1.5 rounded-xl transition-all active:scale-95"
+          style={{
+            background: "rgba(31,195,239,0.08)",
+            border: "1px solid rgba(31,195,239,0.2)",
+            minHeight: 72,
+            padding: "12px 8px",
+          }}
+          data-testid={`btn-camera-${docType}`}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--miami-blue)" strokeWidth="1.5">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--miami-blue)", fontFamily: "Industry, sans-serif", letterSpacing: "0.05em" }}>
+            Take Photo
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="flex-1 flex flex-col items-center justify-center gap-1.5 rounded-xl transition-all active:scale-95"
+          style={{
+            background: "rgba(255,255,255,0.05)",
+            border: "1px solid rgba(255,255,255,0.12)",
+            minHeight: 72,
+            padding: "12px 8px",
+          }}
+          data-testid={`btn-browse-${docType}`}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="1.5">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
             <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
           </svg>
-          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
-            Drop file or <span style={{ color: "var(--miami-blue)" }}>click to browse</span>
-          </p>
-          <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginTop: 3 }}>
-            JPG, PNG, PDF — max 20MB
-          </p>
-        </>
-      )}
+          <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.55)", fontFamily: "Industry, sans-serif", letterSpacing: "0.05em" }}>
+            Browse Files
+          </span>
+        </button>
+      </div>
+
+      {/* Desktop: classic drop zone */}
+      <div
+        className={`drop-zone hidden md:block p-5 text-center cursor-pointer transition-all ${isDragging ? "drag-over" : ""}`}
+        onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
+        data-testid={`drop-zone-${docType}`}
+      >
+        <svg className="mx-auto mb-1.5" width="20" height="20" viewBox="0 0 24 24" fill="none"
+          stroke="var(--miami-blue)" strokeWidth="1.5">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
+          Drop file or <span style={{ color: "var(--miami-blue)" }}>click to browse</span>
+        </p>
+        <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginTop: 3 }}>
+          JPG, PNG, PDF — max 20MB
+        </p>
+      </div>
     </div>
   );
 }
@@ -176,7 +244,6 @@ export default function UploadPage() {
     },
   });
 
-  // Uploaded count by key
   const uploadedByType = (key: string) => docs.filter(d => d.docType === key);
   const initialUploaded  = INITIAL_REQUIRED.filter(d => uploadedByType(d.key).length > 0).length;
   const postUploaded     = POST_REQUIRED.filter(d => uploadedByType(d.key).length > 0).length;
@@ -188,39 +255,36 @@ export default function UploadPage() {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(160deg, #002639 0%, #004363 60%, #003552 100%)" }}>
       {/* Header */}
-      <header className="flex items-center justify-between px-8 py-5 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
-        <MotoLogoFull height={36} />
-        <div className="flex items-center gap-4">
-          {client && (
-            <div className="text-right">
-              <p style={{ fontSize: 13, fontWeight: 700, color: "white" }}>{clientName}</p>
-              {client.email && <p style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{client.email}</p>}
-              {client.phone && <p style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{client.phone}</p>}
-            </div>
-          )}
-        </div>
+      <header className="flex items-center justify-between px-4 md:px-8 py-4 md:py-5 border-b flex-shrink-0" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+        <MotoLogoFull height={30} />
+        {client && (
+          <div className="text-right">
+            <p style={{ fontSize: 13, fontWeight: 700, color: "white" }}>{clientName}</p>
+            <p className="hidden sm:block" style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{client.email}</p>
+          </div>
+        )}
       </header>
 
-      <main className="flex-1 flex items-start justify-center px-4 py-10">
+      <main className="flex-1 flex items-start justify-center px-4 py-6 md:py-10 pb-28 md:pb-10">
         <div className="w-full animate-in" style={{ maxWidth: 700 }}>
 
           {/* Progress header */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-2">
-              <div>
+          <div className="mb-6 md:mb-8">
+            <div className="flex items-start justify-between mb-2 gap-3">
+              <div className="flex-1 min-w-0">
                 <p style={{ color: "var(--miami-blue)", fontSize: 11, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 4 }}>
                   Document Center
                 </p>
-                <h1 style={{ fontSize: 22, fontWeight: 900, color: "white" }}>Upload Your Documents</h1>
+                <h1 style={{ fontSize: 20, fontWeight: 900, color: "white" }} className="md:text-2xl">Upload Your Documents</h1>
               </div>
-              <span className="px-3 py-1.5 rounded-full text-xs font-bold"
+              <span className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold"
                 style={{ background: "rgba(31,195,239,0.15)", color: "var(--miami-blue)", border: "1px solid rgba(31,195,239,0.3)" }}>
                 {totalProgress}/{totalRequired} Required
               </span>
             </div>
-            <p style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", marginTop: 8 }}>
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginTop: 8 }}>
               Upload what you have now and come back any time to add more.
-              Items marked ★ are required to complete your application.
+              Items marked ★ are required.
             </p>
 
             {/* Progress bar */}
@@ -234,14 +298,14 @@ export default function UploadPage() {
           </div>
 
           {/* Document sections */}
-          <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-6 md:gap-8">
             {DOC_SECTIONS.map((section, si) => {
               const isPostPurchase = section.docs.every(d => d.phase === "post_purchase");
               return (
                 <div key={si}>
                   {/* Section heading */}
                   <div className="flex items-center gap-3 mb-3">
-                    <h2 style={{ fontSize: 15, fontWeight: 700, color: "white" }}>{section.title}</h2>
+                    <h2 style={{ fontSize: 14, fontWeight: 700, color: "white" }}>{section.title}</h2>
                     {section.badge && (
                       <span className="px-2 py-0.5 rounded-full text-xs font-bold"
                         style={{ background: "rgba(242,234,0,0.12)", color: "var(--sao-paulo)", border: "1px solid rgba(242,234,0,0.25)" }}>
@@ -249,7 +313,7 @@ export default function UploadPage() {
                       </span>
                     )}
                   </div>
-                  <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", marginBottom: 12 }}>{section.description}</p>
+                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 10 }}>{section.description}</p>
 
                   {/* Doc slots */}
                   <div className="flex flex-col gap-3">
@@ -263,15 +327,15 @@ export default function UploadPage() {
                             border: `1px solid ${isDone ? "rgba(173,240,41,0.2)" : isPostPurchase ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.09)"}`,
                           }}>
                           {/* Slot header */}
-                          <div className="flex items-center justify-between px-5 py-4"
+                          <div className="flex items-center justify-between px-4 md:px-5 py-3 md:py-4"
                             style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-                            <div className="flex items-center gap-3">
-                              <span style={{ fontSize: 18 }}>{dt.icon}</span>
-                              <div>
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <span style={{ fontSize: 18, flexShrink: 0 }}>{dt.icon}</span>
+                              <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span style={{ fontWeight: 700, fontSize: 14, color: "white" }}>{dt.label}</span>
+                                  <span style={{ fontWeight: 700, fontSize: 13, color: "white" }}>{dt.label}</span>
                                   {dt.required && (
-                                    <span style={{ color: "var(--sao-paulo)", fontSize: 10, fontWeight: 700, letterSpacing: "0.05em" }}>★ REQUIRED</span>
+                                    <span style={{ color: "var(--sao-paulo)", fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", flexShrink: 0 }}>★ REQUIRED</span>
                                   )}
                                 </div>
                                 {"sublabel" in dt && dt.sublabel && (
@@ -285,7 +349,7 @@ export default function UploadPage() {
                               </div>
                             </div>
                             {isDone && (
-                              <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center"
+                              <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center ml-2"
                                 style={{ background: "rgba(173,240,41,0.15)" }}>
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--gelbgrun)" strokeWidth="2.5">
                                   <polyline points="20 6 9 17 4 12"/>
@@ -296,12 +360,12 @@ export default function UploadPage() {
 
                           {/* Uploaded files */}
                           {uploaded.length > 0 && (
-                            <div className="px-5 py-3 flex flex-col gap-2"
+                            <div className="px-4 md:px-5 py-3 flex flex-col gap-2"
                               style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
                               {uploaded.map(doc => (
-                                <div key={doc.id} className="flex items-center justify-between">
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                                <div key={doc.id} className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
                                       style={{ background: "rgba(31,195,239,0.12)" }}>
                                       {doc.mimeType.includes("pdf") ? (
                                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--miami-blue)" strokeWidth="2">
@@ -316,23 +380,23 @@ export default function UploadPage() {
                                         </svg>
                                       )}
                                     </div>
-                                    <div>
-                                      <p style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", fontWeight: 500 }}>{doc.originalName}</p>
-                                      <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{formatBytes(doc.fileSize)}</p>
+                                    <div className="min-w-0">
+                                      <p style={{ fontSize: 12, color: "rgba(255,255,255,0.8)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{doc.originalName}</p>
+                                      <p style={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>{formatBytes(doc.fileSize)}</p>
                                     </div>
                                   </div>
                                   <button
                                     onClick={() => deleteMutation.mutate(doc.id)}
                                     data-testid={`btn-delete-doc-${doc.id}`}
-                                    style={{ color: "rgba(255,255,255,0.3)", fontSize: 18, lineHeight: 1 }}
-                                    className="hover:text-red-400 transition-colors px-1">×</button>
+                                    style={{ color: "rgba(255,255,255,0.3)", fontSize: 20, lineHeight: 1, flexShrink: 0, minWidth: 36, minHeight: 36, display: "flex", alignItems: "center", justifyContent: "center" }}
+                                    className="hover:text-red-400 transition-colors">×</button>
                                 </div>
                               ))}
                             </div>
                           )}
 
-                          {/* Drop zone */}
-                          <div className="p-4">
+                          {/* Drop zone / upload buttons */}
+                          <div className="p-3 md:p-4">
                             <DropZone docType={dt.key} clientId={clientId} onUploaded={refetch} />
                           </div>
                         </div>
@@ -344,8 +408,8 @@ export default function UploadPage() {
             })}
           </div>
 
-          {/* Action buttons */}
-          <div className="mt-10 flex flex-col gap-3">
+          {/* Desktop action button */}
+          <div className="hidden md:flex flex-col gap-3 mt-10">
             <button
               onClick={() => navigate("/portal")}
               data-testid="btn-save-return"
@@ -365,11 +429,34 @@ export default function UploadPage() {
             )}
           </div>
 
-          <p className="text-center mt-4" style={{ fontSize: 12, color: "rgba(255,255,255,0.3)" }}>
+          <p className="hidden md:block text-center mt-4" style={{ fontSize: 12, color: "rgba(255,255,255,0.3)" }}>
             Your uploads are saved automatically. Log back in any time to continue.
           </p>
         </div>
       </main>
+
+      {/* ── Mobile sticky bottom bar ── */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 px-4 py-3"
+        style={{ background: "rgba(0,38,57,0.97)", borderTop: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(12px)" }}>
+        <button
+          onClick={() => navigate("/portal")}
+          data-testid="btn-save-return-mobile"
+          className="w-full rounded-xl font-bold transition-all active:scale-95"
+          style={{
+            background: "var(--miami-blue)",
+            color: "var(--shelby-blue)",
+            fontSize: 15,
+            fontFamily: "Industry, sans-serif",
+            minHeight: 52,
+          }}>
+          Save &amp; Return to Dashboard
+        </button>
+        {initialUploaded >= INITIAL_REQUIRED.length && (
+          <p className="text-center mt-2" style={{ fontSize: 11, color: "var(--gelbgrun)", fontWeight: 600 }}>
+            ✓ Initial required docs complete
+          </p>
+        )}
+      </div>
     </div>
   );
 }

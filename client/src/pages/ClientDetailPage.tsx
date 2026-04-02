@@ -48,12 +48,12 @@ function SectionCard({ title, icon, children, accent }: {
   return (
     <div className="rounded-2xl overflow-hidden"
       style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${accent || "rgba(255,255,255,0.09)"}` }}>
-      <div className="flex items-center gap-3 px-5 py-4 border-b"
+      <div className="flex items-center gap-3 px-4 md:px-5 py-3 md:py-4 border-b"
         style={{ borderColor: accent || "rgba(255,255,255,0.07)" }}>
         <span style={{ color: accent || "var(--miami-blue)" }}>{icon}</span>
         <h3 style={{ fontWeight: 700, fontSize: 14, color: "white", letterSpacing: "0.03em" }}>{title}</h3>
       </div>
-      <div className="px-5 py-4">{children}</div>
+      <div className="px-4 md:px-5 py-4">{children}</div>
     </div>
   );
 }
@@ -61,8 +61,8 @@ function SectionCard({ title, icon, children, accent }: {
 function Row({ label, value }: { label: string; value?: string | null | boolean }) {
   if (!value && value !== false) return null;
   return (
-    <div className="flex items-start gap-3 py-1.5">
-      <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "0.08em", textTransform: "uppercase", minWidth: 120, paddingTop: 1 }}>{label}</span>
+    <div className="flex items-start gap-2 py-1.5">
+      <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "0.08em", textTransform: "uppercase", minWidth: 90, paddingTop: 1, flexShrink: 0 }}>{label}</span>
       <span style={{ fontSize: 13, color: "rgba(255,255,255,0.82)", flex: 1 }}>{String(value)}</span>
     </div>
   );
@@ -89,20 +89,21 @@ function AssigneePicker({ clientId, current, onChange }: {
   });
 
   return (
-    <div className="flex gap-3 flex-wrap">
+    <div className="flex gap-2 md:gap-3 flex-wrap">
       {AGENTS.map(agent => {
         const active = current === agent.key;
         return (
           <button key={agent.key}
             onClick={() => mutation.mutate(active ? null : agent.key)}
-            className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl font-bold text-sm transition-all"
+            className="flex items-center gap-2 md:gap-2.5 px-3 md:px-4 py-2 md:py-2.5 rounded-xl font-bold text-sm transition-all"
             style={{
               background: active ? `${agent.color}22` : "rgba(255,255,255,0.05)",
               border: `2px solid ${active ? agent.color : "rgba(255,255,255,0.1)"}`,
               color: active ? agent.color : "rgba(255,255,255,0.5)",
               fontFamily: "Industry, sans-serif",
+              minHeight: 44,
             }}>
-            <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black"
+            <div className="w-6 h-6 md:w-7 md:h-7 rounded-full flex items-center justify-center text-xs font-black"
               style={{ background: active ? `${agent.color}33` : "rgba(255,255,255,0.08)", color: active ? agent.color : "rgba(255,255,255,0.4)" }}>
               {agent.initials}
             </div>
@@ -117,7 +118,7 @@ function AssigneePicker({ clientId, current, onChange }: {
       })}
       {!current && (
         <span style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", alignSelf: "center", paddingLeft: 4 }}>
-          Not assigned — click to assign
+          Not assigned — tap to assign
         </span>
       )}
     </div>
@@ -150,7 +151,6 @@ function DealBuilder({ client, onSave }: { client: Client; onSave: () => void })
     setDirty(true);
   };
 
-  // Pre-fill suggestions from questionnaire
   const suggestedMakes = parseJson(client.preferredMakes);
   const suggestedExt   = client.exteriorColors || "";
   const suggestedInt   = parseJson(client.interiorColors);
@@ -165,6 +165,7 @@ function DealBuilder({ client, onSave }: { client: Client; onSave: () => void })
     fontSize: 14,
     fontFamily: "Industry, sans-serif",
     outline: "none",
+    minHeight: 44,
   };
 
   const labelStyle: React.CSSProperties = {
@@ -213,8 +214,8 @@ function DealBuilder({ client, onSave }: { client: Client; onSave: () => void })
         </div>
       )}
 
-      {/* 2-col grid for main fields */}
-      <div className="grid grid-cols-2 gap-3">
+      {/* 2-col on desktop, 1-col on mobile */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label style={labelStyle}>Make</label>
           <input style={fieldStyle} value={form.finalMake} onChange={set("finalMake")} placeholder="e.g. BMW" />
@@ -241,7 +242,6 @@ function DealBuilder({ client, onSave }: { client: Client; onSave: () => void })
         </div>
       </div>
 
-      {/* Options / config */}
       <div>
         <label style={labelStyle}>Must-Have Options / Configuration</label>
         <textarea style={{ ...fieldStyle, minHeight: 80, resize: "vertical" }}
@@ -249,7 +249,6 @@ function DealBuilder({ client, onSave }: { client: Client; onSave: () => void })
           placeholder="e.g. Sunroof, HUD, M Sport brakes, no sunroof delete, carbon fiber trim..." />
       </div>
 
-      {/* Deal notes for Mike */}
       <div>
         <label style={labelStyle}>Deal Notes for Sourcing</label>
         <textarea style={{ ...fieldStyle, minHeight: 80, resize: "vertical" }}
@@ -257,14 +256,13 @@ function DealBuilder({ client, onSave }: { client: Client; onSave: () => void })
           placeholder="Internal notes for Mike Minerva — budget constraints, timing, dealer preferences, etc." />
       </div>
 
-      {/* Save */}
-      <div className="flex items-center justify-between pt-1">
+      <div className="flex items-center justify-between pt-1 gap-3">
         <p style={{ fontSize: 12, color: dirty ? "#F2EA00" : "rgba(255,255,255,0.25)" }}>
           {dirty ? "Unsaved changes" : (client.finalMake ? "Deal build saved" : "Not yet configured")}
         </p>
         <button onClick={() => mutation.mutate()} disabled={!dirty || mutation.isPending}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all hover:opacity-90 disabled:opacity-40"
-          style={{ background: "var(--miami-blue)", color: "var(--shelby-blue)", fontFamily: "Industry, sans-serif" }}>
+          className="flex items-center gap-2 px-4 md:px-5 py-2.5 rounded-xl font-bold text-sm transition-all hover:opacity-90 disabled:opacity-40 flex-shrink-0"
+          style={{ background: "var(--miami-blue)", color: "var(--shelby-blue)", fontFamily: "Industry, sans-serif", minHeight: 44 }}>
           {mutation.isPending ? (
             <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: "var(--shelby-blue)", borderTopColor: "transparent" }} />
           ) : (
@@ -296,10 +294,10 @@ function DocPanel({ docs, clientId }: { docs: Document[]; clientId: string }) {
   return (
     <div className="flex flex-col gap-2">
       {docs.map(doc => (
-        <div key={doc.id} className="flex items-center gap-3 rounded-xl px-4 py-3"
+        <div key={doc.id} className="flex items-center gap-3 rounded-xl px-3 md:px-4 py-3"
           style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
           {/* Icon */}
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+          <div className="w-8 md:w-9 h-8 md:h-9 rounded-lg flex items-center justify-center flex-shrink-0"
             style={{ background: "rgba(31,195,239,0.12)" }}>
             {doc.mimeType === "application/pdf" ? (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--miami-blue)" strokeWidth="2">
@@ -323,19 +321,19 @@ function DocPanel({ docs, clientId }: { docs: Document[]; clientId: string }) {
             </p>
           </div>
           {/* Actions */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-1.5 md:gap-2 flex-shrink-0">
             <a href={`https://portal.motosaic.com/api/files/${doc.storedName}/download`}
               download={doc.originalName}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:opacity-80"
-              style={{ background: "rgba(173,240,41,0.12)", color: "var(--gelbgrun)", border: "1px solid rgba(173,240,41,0.2)", textDecoration: "none" }}>
+              className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:opacity-80"
+              style={{ background: "rgba(173,240,41,0.12)", color: "var(--gelbgrun)", border: "1px solid rgba(173,240,41,0.2)", textDecoration: "none", minHeight: 36 }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                 <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
               </svg>
-              Download
+              <span className="hidden sm:inline">Download</span>
             </a>
             <button onClick={() => deleteMutation.mutate(doc.id)}
-              className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:opacity-80"
+              className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:opacity-80"
               style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2">
                 <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
@@ -405,8 +403,8 @@ export default function ClientDetailPage() {
   return (
     <div className="min-h-screen flex" style={{ background: "#001520" }}>
 
-      {/* ── Sidebar ── */}
-      <aside className="flex flex-col w-56 flex-shrink-0 px-4 py-6 border-r"
+      {/* ── Desktop Sidebar (hidden on mobile) ── */}
+      <aside className="hidden lg:flex flex-col w-56 flex-shrink-0 px-4 py-6 border-r"
         style={{ borderColor: "rgba(255,255,255,0.08)", background: "#001a28" }}>
         <div className="mb-8"><MotoLogoFull height={32} /></div>
         <nav className="flex flex-col gap-1">
@@ -432,37 +430,49 @@ export default function ClientDetailPage() {
       </aside>
 
       {/* ── Main ── */}
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto min-w-0">
 
         {/* Header */}
-        <header className="flex items-center justify-between px-8 py-5 border-b sticky top-0 z-10"
+        <header className="flex items-center justify-between px-4 md:px-8 py-4 md:py-5 border-b sticky top-0 z-10 gap-3"
           style={{ borderColor: "rgba(255,255,255,0.08)", background: "#001520" }}>
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            {/* Mobile back button */}
+            <button
+              onClick={() => navigate("/admin")}
+              className="lg:hidden flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center"
+              style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}
+              data-testid="btn-back-to-clients"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2">
+                <polyline points="15 18 9 12 15 6"/>
+              </svg>
+            </button>
+
+            <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
               style={{ background: assignedAgent ? `${assignedAgent.color}22` : "rgba(31,195,239,0.15)" }}>
-              <span style={{ fontSize: 16, fontWeight: 900, color: assignedAgent?.color || "var(--miami-blue)" }}>
+              <span style={{ fontSize: 14, fontWeight: 900, color: assignedAgent?.color || "var(--miami-blue)" }}>
                 {client.firstName[0]}{client.lastName[0]}
               </span>
             </div>
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 style={{ fontSize: 20, fontWeight: 900, color: "white" }}>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 style={{ fontSize: 17, fontWeight: 900, color: "white" }}>
                   {client.firstName} {client.lastName}
                 </h1>
                 {assignedAgent && (
-                  <span className="px-2.5 py-1 rounded-full text-xs font-bold"
+                  <span className="hidden sm:inline px-2.5 py-1 rounded-full text-xs font-bold"
                     style={{ background: `${assignedAgent.color}22`, color: assignedAgent.color, border: `1px solid ${assignedAgent.color}44` }}>
                     {assignedAgent.label}
                   </span>
                 )}
                 {dealComplete && (
-                  <span className="px-2.5 py-1 rounded-full text-xs font-bold"
+                  <span className="hidden sm:inline px-2.5 py-1 rounded-full text-xs font-bold"
                     style={{ background: "rgba(173,240,41,0.12)", color: "var(--gelbgrun)", border: "1px solid rgba(173,240,41,0.25)" }}>
                     Deal Built
                   </span>
                 )}
               </div>
-              <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>
+              <p className="hidden sm:block" style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {client.email} · {client.phone}
                 {client.city && ` · ${client.city}, ${client.state}`}
               </p>
@@ -470,24 +480,25 @@ export default function ClientDetailPage() {
           </div>
 
           {/* Status selector */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {client.driveFolder && (
               <a href={client.driveFolder} target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-all hover:opacity-80"
-                style={{ background: "rgba(173,240,41,0.1)", color: "var(--gelbgrun)", border: "1px solid rgba(173,240,41,0.2)", textDecoration: "none" }}>
-                Open Drive
+                className="hidden sm:flex items-center gap-2 px-3 md:px-4 py-2 rounded-xl font-bold text-sm transition-all hover:opacity-80"
+                style={{ background: "rgba(173,240,41,0.1)", color: "var(--gelbgrun)", border: "1px solid rgba(173,240,41,0.2)", textDecoration: "none", minHeight: 38 }}>
+                <span className="hidden md:inline">Open Drive</span>
+                <span className="sm:hidden md:hidden">Drive</span>
               </a>
             )}
             <select value={client.status || "new"} onChange={e => statusMutation.mutate(e.target.value)}
-              className="rounded-xl px-3 py-2 text-xs font-bold cursor-pointer"
-              style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.8)", fontFamily: "Industry, sans-serif" }}>
+              className="rounded-xl px-2 md:px-3 py-2 text-xs font-bold cursor-pointer"
+              style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.8)", fontFamily: "Industry, sans-serif", minHeight: 38 }}>
               {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
           </div>
         </header>
 
         {/* ── Page body ── */}
-        <div className="px-8 py-6 flex flex-col gap-5 max-w-5xl">
+        <div className="px-4 md:px-8 py-4 md:py-6 flex flex-col gap-4 md:gap-5 max-w-5xl pb-24 lg:pb-6">
 
           {/* ── 1. ASSIGNMENT ── */}
           <SectionCard title="Deal Assignment" accent="rgba(31,195,239,0.25)" icon={
@@ -500,14 +511,16 @@ export default function ClientDetailPage() {
           </SectionCard>
 
           {/* ── 2. CLIENT SNAPSHOT ── */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="col-span-2">
+          {/* On mobile: stack vertically. On desktop: 2/3 + 1/3 grid */}
+          <div className="flex flex-col lg:grid lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2">
               <SectionCard title="Client Overview" icon={
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
                 </svg>
               }>
-                <div className="grid grid-cols-2 gap-x-6">
+                {/* 2-col on sm+, 1-col on mobile */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
                   <div>
                     <Row label="Name"      value={`${client.firstName} ${client.lastName}`} />
                     <Row label="Phone"     value={client.phone} />
@@ -575,43 +588,43 @@ export default function ClientDetailPage() {
             </SectionCard>
 
             {/* Vehicle wish list — full width */}
-            <div className="col-span-3">
-            <SectionCard title="What They Want" icon={
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 1 1 4.93 19.07"/>
-              </svg>
-            }>
-              <div className="flex flex-col gap-3">
-                {preferredMakes.length > 0 && (
-                  <div>
-                    <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Makes</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {preferredMakes.map((m: string) => <Pill key={m} label={m} />)}
+            <div className="lg:col-span-3">
+              <SectionCard title="What They Want" icon={
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 1 1 4.93 19.07"/>
+                </svg>
+              }>
+                <div className="flex flex-col gap-3">
+                  {preferredMakes.length > 0 && (
+                    <div>
+                      <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Makes</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {preferredMakes.map((m: string) => <Pill key={m} label={m} />)}
+                      </div>
                     </div>
-                  </div>
-                )}
-                {bodyStyles.length > 0 && (
-                  <div>
-                    <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Body Style</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {bodyStyles.map((s: string) => <Pill key={s} label={s} />)}
+                  )}
+                  {bodyStyles.length > 0 && (
+                    <div>
+                      <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Body Style</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {bodyStyles.map((s: string) => <Pill key={s} label={s} />)}
+                      </div>
                     </div>
-                  </div>
-                )}
-                {client.exteriorColors && (
-                  <Row label="Ext Color" value={client.exteriorColors} />
-                )}
-                {intColors.length > 0 && (
-                  <Row label="Int Color" value={intColors.join(", ")} />
-                )}
-                {client.mustHaveFeatures && (
-                  <Row label="Must-Have" value={client.mustHaveFeatures} />
-                )}
-                {client.preferredModels && (
-                  <Row label="Models" value={client.preferredModels} />
-                )}
-              </div>
-            </SectionCard>
+                  )}
+                  {client.exteriorColors && (
+                    <Row label="Ext Color" value={client.exteriorColors} />
+                  )}
+                  {intColors.length > 0 && (
+                    <Row label="Int Color" value={intColors.join(", ")} />
+                  )}
+                  {client.mustHaveFeatures && (
+                    <Row label="Must-Have" value={client.mustHaveFeatures} />
+                  )}
+                  {client.preferredModels && (
+                    <Row label="Models" value={client.preferredModels} />
+                  )}
+                </div>
+              </SectionCard>
             </div>
           </div>
 
@@ -645,7 +658,7 @@ export default function ClientDetailPage() {
                 <polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
               </svg>
             }>
-              <div className="grid grid-cols-2 gap-x-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
                 <div>
                   <Row label="Year"      value={client.tradeYear} />
                   <Row label="Make"      value={client.tradeMake} />
@@ -679,12 +692,12 @@ export default function ClientDetailPage() {
                 <div className="flex gap-2">
                   <button onClick={() => notesMutation.mutate()}
                     className="px-4 py-2 rounded-xl text-sm font-bold"
-                    style={{ background: "var(--miami-blue)", color: "var(--shelby-blue)", fontFamily: "Industry, sans-serif" }}>
+                    style={{ background: "var(--miami-blue)", color: "var(--shelby-blue)", fontFamily: "Industry, sans-serif", minHeight: 44 }}>
                     Save Notes
                   </button>
                   <button onClick={() => setEditingNotes(false)}
                     className="px-4 py-2 rounded-xl text-sm font-bold"
-                    style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.6)", fontFamily: "Industry, sans-serif" }}>
+                    style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.6)", fontFamily: "Industry, sans-serif", minHeight: 44 }}>
                     Cancel
                   </button>
                 </div>
@@ -692,11 +705,11 @@ export default function ClientDetailPage() {
             ) : (
               <div className="flex items-start justify-between gap-4">
                 <p style={{ fontSize: 13, color: client.notes ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.3)", lineHeight: 1.6, whiteSpace: "pre-wrap", flex: 1 }}>
-                  {client.notes || "No notes yet — click Edit to add internal notes."}
+                  {client.notes || "No notes yet — tap Edit to add internal notes."}
                 </p>
                 <button onClick={() => setEditingNotes(true)}
-                  className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold"
-                  style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.5)", border: "1px solid rgba(255,255,255,0.1)", fontFamily: "Industry, sans-serif" }}>
+                  className="flex-shrink-0 px-3 py-2 rounded-lg text-xs font-bold"
+                  style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.5)", border: "1px solid rgba(255,255,255,0.1)", fontFamily: "Industry, sans-serif", minHeight: 38 }}>
                   Edit
                 </button>
               </div>
@@ -705,6 +718,49 @@ export default function ClientDetailPage() {
 
         </div>
       </main>
+
+      {/* ── Mobile bottom tab bar (hidden on lg+) ── */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex items-stretch border-t"
+        style={{ background: "#001a28", borderColor: "rgba(255,255,255,0.1)", height: 60 }}>
+        <button
+          onClick={() => navigate("/admin")}
+          className="flex-1 flex flex-col items-center justify-center gap-1 transition-all"
+          style={{ color: "rgba(255,255,255,0.4)" }}
+          data-testid="tab-back-clients"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          <span style={{ fontSize: 10, fontWeight: 700, fontFamily: "Industry, sans-serif", letterSpacing: "0.06em" }}>Clients</span>
+        </button>
+
+        <button
+          className="flex-1 flex flex-col items-center justify-center gap-1"
+          style={{ color: "var(--miami-blue)" }}
+          data-testid="tab-detail-active"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+          </svg>
+          <span style={{ fontSize: 10, fontWeight: 700, fontFamily: "Industry, sans-serif", letterSpacing: "0.06em" }}>Detail</span>
+        </button>
+
+        <button
+          onClick={() => navigate(`/documents/${id}`)}
+          className="flex-1 flex flex-col items-center justify-center gap-1 transition-all"
+          style={{ color: "rgba(255,255,255,0.4)" }}
+          data-testid="tab-docs"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          <span style={{ fontSize: 10, fontWeight: 700, fontFamily: "Industry, sans-serif", letterSpacing: "0.06em" }}>Docs</span>
+        </button>
+      </nav>
     </div>
   );
 }

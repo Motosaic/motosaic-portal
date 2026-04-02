@@ -78,7 +78,7 @@ const STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL"
 
 function StepDots({ current, total }: { current: number; total: number }) {
   return (
-    <div className="step-indicator mb-8">
+    <div className="step-indicator mb-6 md:mb-8">
       {Array.from({ length: total }).map((_, i) => (
         <>
           <div key={i} className={`step ${i < current ? "done" : i === current ? "active" : ""}`}>
@@ -95,8 +95,13 @@ function StepDots({ current, total }: { current: number; total: number }) {
   );
 }
 
+// Mobile-responsive FieldRow: single column on mobile, configurable on md+
 function FieldRow({ children, cols = 2 }: { children: React.ReactNode; cols?: number }) {
-  return <div className={`grid gap-4 ${cols === 2 ? "grid-cols-2" : cols === 3 ? "grid-cols-3" : "grid-cols-1"}`}>{children}</div>;
+  const gridClass =
+    cols === 2 ? "grid-cols-1 sm:grid-cols-2" :
+    cols === 3 ? "grid-cols-1 sm:grid-cols-3" :
+    "grid-cols-1";
+  return <div className={`grid gap-3 md:gap-4 ${gridClass}`}>{children}</div>;
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -117,12 +122,13 @@ function MultiSelect({ options, value, onChange }: { options: string[]; value: s
     <div className="flex flex-wrap gap-2 mt-1">
       {options.map(o => (
         <button key={o} type="button" onClick={() => toggle(o)}
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150"
+          className="px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150"
           style={{
             background: value.includes(o) ? "var(--miami-blue)" : "rgba(255,255,255,0.07)",
             color: value.includes(o) ? "var(--shelby-blue)" : "rgba(255,255,255,0.65)",
             border: `1px solid ${value.includes(o) ? "var(--miami-blue)" : "rgba(255,255,255,0.1)"}`,
             fontFamily: "Industry, sans-serif",
+            minHeight: 40,
           }}>
           {o}
         </button>
@@ -155,7 +161,7 @@ function TriStateMakes({ makes, state, onChange }: {
             key={make}
             type="button"
             onClick={() => cycle(make)}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150"
+            className="px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150"
             style={{
               background: isPreferred
                 ? "rgba(20,200,80,0.18)"
@@ -175,6 +181,7 @@ function TriStateMakes({ makes, state, onChange }: {
                   : "rgba(255,255,255,0.1)"
               }`,
               fontFamily: "Industry, sans-serif",
+              minHeight: 40,
             }}
           >
             {isPreferred ? "✓ " : isNo ? "✕ " : ""}{make}
@@ -198,15 +205,18 @@ function ToggleGroup({ options, value, onChange, testPrefix }: {
   testPrefix: string;
 }) {
   return (
-    <div className="flex gap-3 mt-1">
+    <div className="flex gap-2 mt-1">
       {options.map(([v, l]) => (
         <button key={v} type="button" onClick={() => onChange(v)}
-          className="flex-1 py-3 rounded-xl text-sm font-bold transition-all"
+          className="flex-1 rounded-xl font-bold transition-all"
           style={{
             background: value === v ? "var(--miami-blue)" : "rgba(255,255,255,0.07)",
             color: value === v ? "var(--shelby-blue)" : "rgba(255,255,255,0.65)",
             border: `1px solid ${value === v ? "var(--miami-blue)" : "rgba(255,255,255,0.1)"}`,
             fontFamily: "Industry, sans-serif",
+            fontSize: 13,
+            minHeight: 48,
+            padding: "10px 8px",
           }}
           data-testid={`${testPrefix}-${v}`}>
           {l}
@@ -235,7 +245,6 @@ export default function IntakePage() {
       return res.json();
     },
     enabled: !!clientId,
-    // Pre-populate name from login data when client loads
     staleTime: 30000,
   });
 
@@ -270,14 +279,11 @@ export default function IntakePage() {
         exteriorColors: JSON.stringify(data.exteriorColors),
         interiorColors: JSON.stringify(data.interiorColors),
       };
-      // Save all data
       await apiRequest("PATCH", `/api/clients/${clientId}/questionnaire`, payload);
-      // Mark complete
       const res = await apiRequest("POST", `/api/clients/${clientId}/questionnaire-complete`);
       return res.json();
     },
     onSuccess: () => {
-      // Navigate to documents page
       navigate(`/documents/${clientId}`);
     },
     onError: () => {
@@ -299,7 +305,7 @@ export default function IntakePage() {
   };
 
   const validateStep = () => {
-    if (step === 0) return true; // email/address optional on step 1 now (name/phone captured at login)
+    if (step === 0) return true;
     if (step === 1) {
       if (!form.purchaseType) return false;
       if (form.purchaseType === "cash") return !!form.timeframe;
@@ -316,14 +322,17 @@ export default function IntakePage() {
     if (step < STEPS.length - 1) {
       saveProgress(form);
       setStep(s => s + 1);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
       mutation.mutate(form);
     }
   };
 
-  const back = () => setStep(s => Math.max(0, s - 1));
+  const back = () => {
+    setStep(s => Math.max(0, s - 1));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
-  // Derived: which fields show on budget step
   const isCash = form.purchaseType === "cash";
   const isLease = form.purchaseType === "lease";
   const isFinance = form.purchaseType === "finance";
@@ -335,23 +344,24 @@ export default function IntakePage() {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(160deg, #002639 0%, #004363 60%, #003552 100%)" }}>
       {/* Header */}
-      <header className="flex items-center justify-between px-8 py-5 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
-        <MotoLogoFull height={36} />
-        <div style={{ color: "rgba(255,255,255,0.45)", fontSize: 13 }}>
-          {clientName && <span style={{ color: "rgba(255,255,255,0.3)", marginRight: 8 }}>{clientName} ·</span>}
-          Step {step + 1} of {STEPS.length} — {STEPS[step].label}
+      <header className="flex items-center justify-between px-4 md:px-8 py-4 md:py-5 border-b flex-shrink-0" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+        <MotoLogoFull height={30} />
+        <div style={{ color: "rgba(255,255,255,0.45)", fontSize: 12 }}>
+          {clientName && <span className="hidden sm:inline" style={{ color: "rgba(255,255,255,0.3)", marginRight: 8 }}>{clientName} ·</span>}
+          Step {step + 1}/{STEPS.length} — {STEPS[step].label}
         </div>
       </header>
 
-      <main className="flex-1 flex items-start justify-center px-4 py-10">
+      {/* Scrollable content — leaves room for sticky bottom nav */}
+      <main className="flex-1 flex items-start justify-center px-4 py-6 md:py-10 pb-28 md:pb-10">
         <div className="w-full animate-in" style={{ maxWidth: 640 }}>
           {/* Step header */}
-          <div className="mb-6">
+          <div className="mb-5 md:mb-6">
             <StepDots current={step} total={STEPS.length} />
-            <h1 style={{ fontSize: 22, fontWeight: 900, color: "white", marginBottom: 6 }}>
+            <h1 style={{ fontSize: 20, fontWeight: 900, color: "white", marginBottom: 4 }} className="md:text-2xl">
               {STEPS[step].label} Information
             </h1>
-            <p style={{ fontSize: 14, color: "rgba(255,255,255,0.45)" }}>
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)" }}>
               {step === 0 && "Your contact and registration details."}
               {step === 1 && "Help us understand your budget and financing goals."}
               {step === 2 && "What kind of vehicle are you looking for?"}
@@ -360,11 +370,11 @@ export default function IntakePage() {
           </div>
 
           {/* Card */}
-          <div className="rounded-2xl p-8" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
+          <div className="rounded-2xl p-5 md:p-8" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
 
             {/* ── Step 1: Contact & Registration Address ── */}
             {step === 0 && (
-              <div className="flex flex-col gap-5">
+              <div className="flex flex-col gap-4 md:gap-5">
                 <FieldRow>
                   <Field label="First Name">
                     <input className="intake-input" placeholder="Mike" value={form.firstName}
@@ -393,7 +403,8 @@ export default function IntakePage() {
                   <input className="intake-input" placeholder="123 Main St" value={form.address}
                     onChange={e => set("address", e.target.value)} data-testid="input-address" />
                 </Field>
-                <FieldRow cols={3}>
+                {/* City / State / ZIP — stacks to 1-col on mobile */}
+                <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
                   <Field label="City">
                     <input className="intake-input" placeholder="Charlotte" value={form.city}
                       onChange={e => set("city", e.target.value)} data-testid="input-city" />
@@ -408,14 +419,13 @@ export default function IntakePage() {
                     <input className="intake-input" placeholder="28202" value={form.zip}
                       onChange={e => set("zip", e.target.value)} data-testid="input-zip" />
                   </Field>
-                </FieldRow>
+                </div>
               </div>
             )}
 
             {/* ── Step 2: Budget (Dynamic) ── */}
             {step === 1 && (
-              <div className="flex flex-col gap-6">
-                {/* Purchase type selector */}
+              <div className="flex flex-col gap-5 md:gap-6">
                 <Field label="How will you purchase? *">
                   <ToggleGroup
                     options={[["cash","Cash"],["finance","Finance / Loan"],["lease","Lease"]]}
@@ -429,7 +439,7 @@ export default function IntakePage() {
 
                 {/* ── Cash ── */}
                 {isCash && (
-                  <div className="flex flex-col gap-5 animate-in">
+                  <div className="flex flex-col gap-4 md:gap-5 animate-in">
                     <FieldRow>
                       <Field label="Total Budget">
                         <input className="intake-input" placeholder="$35,000" value={form.budget}
@@ -455,7 +465,7 @@ export default function IntakePage() {
 
                 {/* ── Finance ── */}
                 {isFinance && (
-                  <div className="flex flex-col gap-5 animate-in">
+                  <div className="flex flex-col gap-4 md:gap-5 animate-in">
                     <FieldRow>
                       <Field label="Total Budget">
                         <input className="intake-input" placeholder="$35,000" value={form.budget}
@@ -489,7 +499,7 @@ export default function IntakePage() {
 
                 {/* ── Lease ── */}
                 {isLease && (
-                  <div className="flex flex-col gap-5 animate-in">
+                  <div className="flex flex-col gap-4 md:gap-5 animate-in">
                     <FieldRow>
                       <Field label="Target Monthly Payment">
                         <input className="intake-input" placeholder="$499/mo" value={form.monthlyPayment}
@@ -546,12 +556,12 @@ export default function IntakePage() {
                     onChange={e => set("preferredModels", e.target.value)} data-testid="input-models" />
                 </Field>
                 <Field label="Must-Have Features">
-                  <textarea className="intake-input" rows={2} placeholder="e.g. Sunroof, AWD, heated seats, third row..."
+                  <textarea className="intake-input" rows={3} placeholder="e.g. Sunroof, AWD, heated seats, third row..."
                     value={form.mustHaveFeatures} onChange={e => set("mustHaveFeatures", e.target.value)}
                     data-testid="textarea-must-have" style={{ resize: "none" }} />
                 </Field>
                 <Field label="Nice-to-Have Features">
-                  <textarea className="intake-input" rows={2} placeholder="e.g. Apple CarPlay, premium audio, cooled seats..."
+                  <textarea className="intake-input" rows={3} placeholder="e.g. Apple CarPlay, premium audio, cooled seats..."
                     value={form.niceToHaveFeatures} onChange={e => set("niceToHaveFeatures", e.target.value)}
                     data-testid="textarea-nice-to-have" style={{ resize: "none" }} />
                 </Field>
@@ -569,15 +579,18 @@ export default function IntakePage() {
             {step === 3 && (
               <div className="flex flex-col gap-5">
                 <Field label="Do you have a vehicle to trade in?">
-                  <div className="flex gap-3 mt-1">
-                    {[[true,"Yes, I have a trade-in"],[false,"No trade-in"]].map(([v,l]) => (
+                  <div className="flex gap-2 mt-1">
+                    {([[true,"Yes, I have a trade-in"],[false,"No trade-in"]] as [boolean, string][]).map(([v,l]) => (
                       <button key={String(v)} type="button" onClick={() => set("hasTradeIn", v)}
-                        className="flex-1 py-3 rounded-xl text-sm font-bold transition-all"
+                        className="flex-1 rounded-xl font-bold transition-all"
                         style={{
                           background: form.hasTradeIn === v ? "var(--miami-blue)" : "rgba(255,255,255,0.07)",
                           color: form.hasTradeIn === v ? "var(--shelby-blue)" : "rgba(255,255,255,0.65)",
                           border: `1px solid ${form.hasTradeIn === v ? "var(--miami-blue)" : "rgba(255,255,255,0.1)"}`,
                           fontFamily: "Industry, sans-serif",
+                          fontSize: 13,
+                          minHeight: 52,
+                          padding: "12px 8px",
                         }}
                         data-testid={`btn-trade-${String(v)}`}>
                         {String(l)}
@@ -587,7 +600,7 @@ export default function IntakePage() {
                 </Field>
 
                 {form.hasTradeIn && (
-                  <div className="flex flex-col gap-5 animate-in">
+                  <div className="flex flex-col gap-4 animate-in">
                     <FieldRow>
                       <Field label="Year">
                         <input className="intake-input" placeholder="2020" value={form.tradeYear}
@@ -632,7 +645,7 @@ export default function IntakePage() {
                 )}
 
                 {!form.hasTradeIn && (
-                  <div className="rounded-xl p-6 text-center" style={{ background: "rgba(31,195,239,0.06)", border: "1px solid rgba(31,195,239,0.15)" }}>
+                  <div className="rounded-xl p-5 text-center" style={{ background: "rgba(31,195,239,0.06)", border: "1px solid rgba(31,195,239,0.15)" }}>
                     <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 14 }}>
                       No trade-in — got it. After submitting, you'll be prompted to upload your key documents.
                     </p>
@@ -642,8 +655,8 @@ export default function IntakePage() {
             )}
           </div>
 
-          {/* Navigation */}
-          <div className="flex gap-3 mt-6">
+          {/* Desktop navigation (hidden on mobile — mobile uses sticky bottom bar) */}
+          <div className="hidden md:flex gap-3 mt-6">
             {step > 0 && (
               <button onClick={back} data-testid="btn-back"
                 className="flex-1 py-3 rounded-xl font-bold transition-all"
@@ -669,11 +682,51 @@ export default function IntakePage() {
             </button>
           </div>
 
-          <p className="text-center mt-4" style={{ fontSize: 12, color: "rgba(255,255,255,0.3)" }}>
+          <p className="hidden md:block text-center mt-4" style={{ fontSize: 12, color: "rgba(255,255,255,0.3)" }}>
             Your progress is saved automatically. You can return at any time.
           </p>
         </div>
       </main>
+
+      {/* ── Mobile sticky bottom navigation bar ── */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 px-4 py-3"
+        style={{ background: "rgba(0,38,57,0.97)", borderTop: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(12px)" }}>
+        <div className="flex gap-3 max-w-lg mx-auto">
+          {step > 0 ? (
+            <button onClick={back} data-testid="btn-back-mobile"
+              className="rounded-xl font-bold transition-all active:scale-95"
+              style={{
+                background: "rgba(255,255,255,0.08)",
+                color: "rgba(255,255,255,0.7)",
+                border: "1px solid rgba(255,255,255,0.12)",
+                fontSize: 15,
+                fontFamily: "Industry, sans-serif",
+                minHeight: 52,
+                minWidth: 64,
+                padding: "0 16px",
+              }}>
+              ←
+            </button>
+          ) : (
+            // Placeholder to keep Next button full-width when no back button
+            <div style={{ minWidth: 0 }} />
+          )}
+          <button onClick={next} disabled={mutation.isPending} data-testid="btn-next-mobile"
+            className="flex-1 rounded-xl font-bold transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
+            style={{
+              background: step === STEPS.length - 1 ? "var(--sao-paulo)" : "var(--miami-blue)",
+              color: "var(--shelby-blue)",
+              fontSize: 15,
+              fontFamily: "Industry, sans-serif",
+              minHeight: 52,
+            }}>
+            {mutation.isPending ? "Saving..." : step === STEPS.length - 1 ? "Save & Continue →" : `Continue to ${STEPS[Math.min(step + 1, STEPS.length - 1)].label} →`}
+          </button>
+        </div>
+        <p className="text-center mt-2" style={{ fontSize: 11, color: "rgba(255,255,255,0.25)" }}>
+          Progress saved automatically
+        </p>
+      </div>
     </div>
   );
 }
