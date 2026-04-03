@@ -417,19 +417,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       fileSize: req.file.size,
     });
     res.status(201).json(doc);
-    // Mirror to Drive if connected
+    // Mirror to Drive immediately — no longer gated on questionnaireComplete
     if (process.env.GOOGLE_REFRESH_TOKEN) {
       const client = storage.getClient(clientId);
-      if (client?.questionnaireComplete) {
-        try {
-          const allDocs = storage.getDocumentsByClient(clientId);
-          const folderUrl = await syncClientToDrive(client, allDocs, UPLOADS_DIR);
-          storage.updateClientDriveFolder(clientId, folderUrl);
-        } catch (err) {
-          console.error("Drive doc sync failed:", err);
-        }
-        // Trigger Minerva sheet update (doc uploaded)
-        triggerSheetSync();
+      if (client) {
+        (async () => {
+          try {
+            const allDocs = storage.getDocumentsByClient(clientId);
+            const folderUrl = await syncClientToDrive(client, allDocs, UPLOADS_DIR);
+            storage.updateClientDriveFolder(clientId, folderUrl);
+          } catch (err) {
+            console.error("[drive] Doc upload sync failed:", err);
+          }
+          triggerSheetSync();
+        })();
       }
     }
   });

@@ -195,17 +195,39 @@ export async function generateQuestionnairePDF(client: Client): Promise<Buffer> 
     section("Vehicle Preferences");
     const makes = parseJson(client.preferredMakes);
     if (makes.length > 0) row("Preferred Makes", makes.join(" · "), true);
+    const notMakes = parseJson((client as any).notInterestedMakes);
+    if (notMakes.length > 0) row("Not Interested In", notMakes.join(", "));
     const bodies = parseJson(client.bodyStyles);
     if (bodies.length > 0) row("Body Style", bodies.join(", "));
     if (client.preferredModels) row("Models in Mind", client.preferredModels);
+    if ((client as any).passengerCount) row("Min. Passengers", String((client as any).passengerCount));
+    if ((client as any).powertrain) row("Powertrain", (client as any).powertrain?.toUpperCase());
+    if ((client as any).evLongRange != null) row("Long-Range EV", (client as any).evLongRange ? "Yes — drives 200+ mi/day" : "No");
+    // SUV-specific details
+    if ((client as any).suvSeatConfig) row("SUV Seat Config", (client as any).suvSeatConfig);
+    if ((client as any).suvMaxSeating) row("Max Seating", String((client as any).suvMaxSeating));
+    if ((client as any).suvNumChildren) row("Children", `${(client as any).suvNumChildren} (ages: ${(client as any).suvChildAges || "not specified"})`);
+    if ((client as any).suvHasPets != null) row("Pets", (client as any).suvHasPets ? "Yes" : "No");
     if (client.exteriorColors) row("Exterior Colors", client.exteriorColors);
     const intColors = parseJson(client.interiorColors);
     if (intColors.length > 0) row("Interior Colors", intColors.join(", "));
-    if (client.mustHaveFeatures) row("Must-Have Features", client.mustHaveFeatures);
+    if (client.mustHaveFeatures) row("Must-Have Features", client.mustHaveFeatures, true);
     if (client.niceToHaveFeatures) row("Nice-to-Have", client.niceToHaveFeatures);
     divider();
 
-    // ── 4. Trade-In
+    // ── 4. Lifestyle & Background
+    const costco    = (client as any).costcoMembership;
+    const veteran   = (client as any).isVeteran;
+    const household = parseJson((client as any).householdVehicles);
+    if (costco || veteran || household.length > 0) {
+      section("Lifestyle & Background");
+      if (costco)              row("Costco Membership", costco.charAt(0).toUpperCase() + costco.slice(1));
+      if (veteran)             row("Veteran / Military", veteran === "yes" ? "Yes" : "No");
+      if (household.length > 0) row("Household Vehicles", household.join(", "));
+      divider();
+    }
+
+    // ── 5. Trade-In
     if (client.hasTradeIn) {
       section("Trade-In Vehicle");
       const tradeDesc = [client.tradeYear, client.tradeMake, client.tradeModel, client.tradeTrim].filter(Boolean).join(" ");
@@ -238,26 +260,37 @@ export async function generateQuestionnairePDF(client: Client): Promise<Buffer> 
   });
 }
 
+// ─── MIME type helpers ────────────────────────────────────────────────────────
+
+function safeMimeType(mimeType: string, originalName: string): string {
+  // Some iOS browsers send HEIC as application/octet-stream — fix it
+  const ext = (originalName || "").split(".").pop()?.toLowerCase();
+  if (ext === "heic" || ext === "heif") return "image/heic";
+  if (mimeType && mimeType !== "application/octet-stream") return mimeType;
+  // Fallback by extension
+  const map: Record<string, string> = {
+    jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
+    gif: "image/gif", webp: "image/webp", pdf: "application/pdf",
+    heic: "image/heic", heif: "image/heif",
+  };
+  return (ext && map[ext]) || "application/octet-stream";
+}
+
 // ─── Main sync function ───────────────────────────────────────────────────────
 
 export async function syncClientToDrive(client: Client, documents: Document[], uploadsDir: string): Promise<string> {
   const drive = await getDrive();
 
-  // Get or create parent "Motosaic Clients" folder
-  const parentId = await getOrCreateFolder(drive, PARENT_FOLDER_NAME);
-
-  // Get or create client subfolder: "Last, First"
+  // ── 1. Folder structure: Motosaic Clients / Last, First / Documents
+  const parentId       = await getOrCreateFolder(drive, PARENT_FOLDER_NAME);
   const clientFolderName = `${client.lastName}, ${client.firstName}`;
   const clientFolderId = await getOrCreateFolder(drive, clientFolderName, parentId);
+  const docsFolderId   = await getOrCreateFolder(drive, "Documents", clientFolderId);
 
-  // Get or create Documents subfolder
-  const docsFolderId = await getOrCreateFolder(drive, "Documents", clientFolderId);
-
-  // Generate + upload/replace PDF
+  // ── 2. Generate + upsert questionnaire PDF (always regenerate so it stays current)
   const pdfBuffer = await generateQuestionnairePDF(client);
-  const pdfName = "Questionnaire Summary.pdf";
+  const pdfName   = "Questionnaire Summary.pdf";
 
-  // Check if PDF already exists (to replace it)
   const existingPdf = await drive.files.list({
     q: `name='${pdfName}' and '${clientFolderId}' in parents and trashed=false`,
     fields: "files(id)",
@@ -265,13 +298,11 @@ export async function syncClientToDrive(client: Client, documents: Document[], u
   });
 
   if (existingPdf.data.files && existingPdf.data.files.length > 0) {
-    // Update existing
     await drive.files.update({
       fileId: existingPdf.data.files[0].id,
       media: { mimeType: "application/pdf", body: Readable.from(pdfBuffer) },
     });
   } else {
-    // Create new
     await drive.files.create({
       requestBody: { name: pdfName, parents: [clientFolderId] },
       media: { mimeType: "application/pdf", body: Readable.from(pdfBuffer) },
@@ -279,27 +310,38 @@ export async function syncClientToDrive(client: Client, documents: Document[], u
     });
   }
 
-  // Mirror any uploaded documents into the Documents subfolder
+  // ── 3. Mirror uploaded documents — upsert (replace if changed, skip if identical)
   for (const doc of documents) {
     const filePath = path.join(uploadsDir, doc.storedName);
     if (!fs.existsSync(filePath)) continue;
 
-    // Check if already uploaded
+    const mime = safeMimeType(doc.mimeType, doc.originalName);
+
+    // Use docType as the canonical filename so re-uploads replace the previous version
+    const driveFileName = `${doc.docType} — ${doc.originalName}`;
+
     const existing = await drive.files.list({
-      q: `name='${doc.originalName}' and '${docsFolderId}' in parents and trashed=false`,
+      q: `name='${driveFileName}' and '${docsFolderId}' in parents and trashed=false`,
       fields: "files(id)",
       spaces: "drive",
     });
-    if (existing.data.files && existing.data.files.length > 0) continue; // already there
 
-    await drive.files.create({
-      requestBody: { name: doc.originalName, parents: [docsFolderId] },
-      media: { mimeType: doc.mimeType, body: fs.createReadStream(filePath) },
-      fields: "id",
-    });
+    if (existing.data.files && existing.data.files.length > 0) {
+      // Replace content in-place (preserves Drive file URL)
+      await drive.files.update({
+        fileId: existing.data.files[0].id,
+        media: { mimeType: mime, body: fs.createReadStream(filePath) },
+      });
+    } else {
+      await drive.files.create({
+        requestBody: { name: driveFileName, parents: [docsFolderId] },
+        media: { mimeType: mime, body: fs.createReadStream(filePath) },
+        fields: "id",
+      });
+    }
   }
 
-  // Return the Drive folder URL
+  // ── 4. Return the client folder URL
   return `https://drive.google.com/drive/folders/${clientFolderId}`;
 }
 
