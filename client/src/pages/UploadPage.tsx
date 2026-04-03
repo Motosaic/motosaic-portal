@@ -427,7 +427,7 @@ export default function UploadPage() {
           {/* Desktop action button */}
           <div className="hidden md:flex flex-col gap-3 mt-10">
             <button
-              onClick={() => navigate("/portal")}
+              onClick={() => navigate(`/portal?id=${clientId}`)}
               data-testid="btn-save-return"
               className="w-full py-4 rounded-xl font-bold transition-all hover:opacity-90 active:scale-95"
               style={{
@@ -458,7 +458,7 @@ export default function UploadPage() {
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 px-4 py-3"
         style={{ background: "rgba(0,38,57,0.97)", borderTop: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(12px)" }}>
         <button
-          onClick={() => navigate("/portal")}
+          onClick={() => navigate(`/portal?id=${clientId}`)}
           data-testid="btn-save-return-mobile"
           className="w-full rounded-xl font-bold transition-all active:scale-95"
           style={{

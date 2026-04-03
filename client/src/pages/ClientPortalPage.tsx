@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MotoLogoFull } from "@/components/MotoLogo";
 import { useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -397,6 +397,34 @@ export default function ClientPortalPage() {
     _cachedSession = null;
     setSession(null);
   };
+
+  // Auto-restore session from ?id= query param (e.g. when returning from UploadPage)
+  useEffect(() => {
+    if (session) return; // already logged in
+    const params = new URLSearchParams(window.location.search);
+    const idParam = params.get("id");
+    if (!idParam) return;
+    // Fetch the client record and restore the session silently
+    apiRequest("GET", `/api/clients/${idParam}`)
+      .then((r) => r.json())
+      .then((client) => {
+        if (client?.id) {
+          handleLogin({
+            id: client.id,
+            email: client.email,
+            phone: client.phone,
+            firstName: client.firstName,
+            lastName: client.lastName,
+            questionnaireComplete: client.questionnaireComplete ?? false,
+            status: client.status ?? "",
+          });
+          // Strip ?id= from the URL bar without triggering a re-render
+          const cleanHash = window.location.hash.split("?")[0];
+          window.history.replaceState(null, "", window.location.pathname + cleanHash);
+        }
+      })
+      .catch(() => { /* silently fall through — login form will show */ });
+  }, []);
 
   if (!session) {
     return <LoginScreen onLogin={handleLogin} />;
