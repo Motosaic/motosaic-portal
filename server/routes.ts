@@ -102,7 +102,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const examples = [
         {
           firstName: "James", lastName: "Thornton",
-          email: "james.thornton@email.com", phone: "(312) 555-0191",
+          email: "james.thornton@email.com", phone: "3125550191",
           address: "842 Lakeview Dr", city: "Chicago", state: "IL", zip: "60614",
           purchaseType: "finance", budget: "$85,000", downPayment: "$15,000",
           monthlyPayment: "$1,200", annualMileage: "12,000", creditScore: "740",
@@ -128,7 +128,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         },
         {
           firstName: "Sarah", lastName: "Delgado",
-          email: "sarah.delgado@email.com", phone: "(305) 555-0284",
+          email: "sarah.delgado@email.com", phone: "3055550284",
           address: "2201 Biscayne Blvd", city: "Miami", state: "FL", zip: "33137",
           purchaseType: "lease", budget: "$70,000", downPayment: "$5,000",
           monthlyPayment: "$850", annualMileage: "10,000", creditScore: "780",
@@ -148,7 +148,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         },
         {
           firstName: "Derek", lastName: "Okafor",
-          email: "derek.okafor@email.com", phone: "(713) 555-0347",
+          email: "derek.okafor@email.com", phone: "7135550347",
           address: "5500 Kirby Dr", city: "Houston", state: "TX", zip: "77005",
           purchaseType: "cash", budget: "$180,000", downPayment: "$180,000",
           timeframe: "ASAP",
@@ -173,7 +173,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         },
         {
           firstName: "Monica", lastName: "Reyes",
-          email: "monica.reyes@email.com", phone: "(424) 555-0462",
+          email: "monica.reyes@email.com", phone: "4245550462",
           address: "1200 Wilshire Blvd", city: "Los Angeles", state: "CA", zip: "90025",
           purchaseType: "finance", budget: "$55,000", downPayment: "$10,000",
           monthlyPayment: "$900", annualMileage: "15,000", creditScore: "700",

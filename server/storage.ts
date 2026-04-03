@@ -144,16 +144,33 @@ export class Storage implements IStorage {
   }
 
   findClientByEmailPhone(email: string, phone: string): schema.Client | undefined {
-    return db
+    const normalizedPhone = phone.replace(/\D/g, "");
+    const normalizedEmail = email.trim().toLowerCase();
+    // First try exact match (covers clients created via the portal with normalized phone)
+    const exact = db
       .select()
       .from(schema.clients)
       .where(
         and(
-          eq(schema.clients.email, email.trim().toLowerCase()),
-          eq(schema.clients.phone, phone.replace(/\D/g, ""))
+          eq(schema.clients.email, normalizedEmail),
+          eq(schema.clients.phone, normalizedPhone)
         )
       )
       .get();
+    if (exact) return exact;
+    // Fallback: load all and compare normalized phones (covers seed data with formatted phones)
+    const all = db
+      .select()
+      .from(schema.clients)
+      .where(eq(schema.clients.email, normalizedEmail))
+      .all();
+    const match = all.find(c => (c.phone ?? "").replace(/\D/g, "") === normalizedPhone);
+    // Self-heal: normalize the stored phone so future lookups hit the fast path
+    if (match && (match.phone ?? "") !== normalizedPhone) {
+      db.update(schema.clients).set({ phone: normalizedPhone }).where(eq(schema.clients.id, match.id)).run();
+      match.phone = normalizedPhone;
+    }
+    return match;
   }
 
   createClientShell(firstName: string, lastName: string, phone: string, email?: string): schema.Client {
