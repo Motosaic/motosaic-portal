@@ -15,8 +15,13 @@ const upload = multer({
   dest: UPLOADS_DIR,
   limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
   fileFilter: (_req, file, cb) => {
-    const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"];
-    cb(null, allowed.includes(file.mimetype));
+    const allowed = [
+      "image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf",
+      "image/heic", "image/heif",  // iPhone HEIC photos
+    ];
+    // Some iOS devices send HEIC with a generic octet-stream mime — allow by extension too
+    const ext = (file.originalname || "").split(".").pop()?.toLowerCase();
+    cb(null, allowed.includes(file.mimetype) || ext === "heic" || ext === "heif");
   },
 });
 

@@ -128,7 +128,7 @@ function DropZone({ docType, clientId, onUploaded }: { docType: string; clientId
         ref={cameraInputRef}
         type="file"
         className="hidden"
-        accept="image/*"
+        accept="image/*,.heic,.heif"
         capture="environment"
         onChange={handleChange}
         data-testid={`input-camera-${docType}`}
@@ -138,7 +138,7 @@ function DropZone({ docType, clientId, onUploaded }: { docType: string; clientId
         ref={fileInputRef}
         type="file"
         className="hidden"
-        accept="image/*,application/pdf"
+        accept="image/*,application/pdf,.heic,.heif"
         onChange={handleChange}
         data-testid={`input-file-${docType}`}
       />
