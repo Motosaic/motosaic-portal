@@ -75,7 +75,7 @@ function LoginScreen({ onLogin }: { onLogin: (session: ClientSession) => void })
         <h1 className="text-center mb-3" style={{ fontSize: 26, fontWeight: 900, color: "white", lineHeight: 1.2 }}>
           Welcome
         </h1>
-        <p className="text-center mb-6 md:mb-8" style={{ fontSize: 14, color: "rgba(255,255,255,0.75)", lineHeight: 1.65, padding: "0 8px" }}>
+        <p className="text-center mb-6 md:mb-8" style={{ fontSize: 14, color: "rgba(255,255,255,0.92)", lineHeight: 1.65, padding: "0 8px" }}>
           Enter your email and phone number to access your onboarding progress or start a new application.
         </p>
 
@@ -118,7 +118,7 @@ function LoginScreen({ onLogin }: { onLogin: (session: ClientSession) => void })
               <line x1="12" y1="8" x2="12" y2="12"/>
               <line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
-            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.75)", lineHeight: 1.6 }}>
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.92)", lineHeight: 1.6 }}>
               <strong style={{ color: "var(--miami-blue)" }}>Remember these details.</strong> Your email and phone number are your login going forward.
             </p>
           </div>
@@ -141,7 +141,7 @@ function LoginScreen({ onLogin }: { onLogin: (session: ClientSession) => void })
           </button>
         </div>
 
-        <p className="text-center mt-5 md:mt-6" style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", padding: "0 8px" }}>
+        <p className="text-center mt-5 md:mt-6" style={{ fontSize: 13, color: "rgba(255,255,255,0.68)", padding: "0 8px" }}>
           New client? Enter your details to get started.
           Returning? Use the same email &amp; phone to pick up where you left off.
         </p>
@@ -184,11 +184,11 @@ function ProgressHub({ session, onReset, isUAT }: { session: ClientSession; onRe
         <div className="flex items-center gap-3 md:gap-5">
           <div className="text-right">
             <p style={{ fontSize: 13, fontWeight: 700, color: "white" }}>{session.firstName} {session.lastName}</p>
-            <p className="hidden sm:block" style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{session.email}</p>
+            <p className="hidden sm:block" style={{ fontSize: 11, color: "rgba(255,255,255,0.85)" }}>{session.email}</p>
           </div>
           <button
             onClick={onReset}
-            style={{ color: "rgba(255,255,255,0.35)", fontSize: 13, fontFamily: "Industry, sans-serif" }}
+            style={{ color: "rgba(255,255,255,0.78)", fontSize: 13, fontFamily: "Industry, sans-serif" }}
             className="hover:text-white transition-colors"
             data-testid="btn-logout"
           >
@@ -208,7 +208,7 @@ function ProgressHub({ session, onReset, isUAT }: { session: ClientSession; onRe
             <h1 style={{ fontSize: 24, fontWeight: 900, color: "white", marginBottom: 8 }}>
               Welcome back, {session.firstName}.
             </h1>
-            <p style={{ fontSize: 14, color: "rgba(255,255,255,0.5)" }}>
+            <p style={{ fontSize: 14, color: "rgba(255,255,255,0.92)" }}>
               {!qComplete
                 ? "Complete your questionnaire to help us find your perfect vehicle."
                 : !docsComplete
@@ -220,7 +220,7 @@ function ProgressHub({ session, onReset, isUAT }: { session: ClientSession; onRe
           {/* Overall progress bar */}
           <div className="mb-6 md:mb-8">
             <div className="flex justify-between mb-2">
-              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>Overall Progress</span>
+              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.82)" }}>Overall Progress</span>
               <span style={{ fontSize: 12, color: "var(--miami-blue)", fontWeight: 700 }}>
                 {[qComplete, docsComplete].filter(Boolean).length} / 2 steps complete
               </span>
@@ -275,7 +275,7 @@ function ProgressHub({ session, onReset, isUAT }: { session: ClientSession; onRe
               <p style={{ fontWeight: 700, color: "var(--gelbgrun)", fontSize: 15, marginBottom: 4 }}>
                 Application Complete
               </p>
-              <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>
+              <p style={{ fontSize: 13, color: "rgba(255,255,255,0.92)" }}>
                 Your Motosaic advisor will reach out within one business day.
               </p>
             </div>
@@ -346,7 +346,7 @@ function StepCard({
           )}
           {locked && (
             <span className="px-2 py-0.5 rounded-full text-xs font-bold"
-              style={{ background: "rgba(255,255,255,0.09)", color: "rgba(255,255,255,0.45)", border: "1px solid rgba(255,255,255,0.15)" }}>
+              style={{ background: "rgba(255,255,255,0.09)", color: "rgba(255,255,255,0.68)", border: "1px solid rgba(255,255,255,0.15)" }}>
               Locked
             </span>
           )}

@@ -62,7 +62,7 @@ function Row({ label, value }: { label: string; value?: string | null | boolean 
   if (!value && value !== false) return null;
   return (
     <div className="flex items-start gap-2 py-1.5">
-      <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "0.08em", textTransform: "uppercase", minWidth: 90, paddingTop: 1, flexShrink: 0 }}>{label}</span>
+      <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.78)", letterSpacing: "0.08em", textTransform: "uppercase", minWidth: 90, paddingTop: 1, flexShrink: 0 }}>{label}</span>
       <span style={{ fontSize: 13, color: "rgba(255,255,255,0.82)", flex: 1 }}>{String(value)}</span>
     </div>
   );
@@ -117,7 +117,7 @@ function AssigneePicker({ clientId, current, onChange }: {
         );
       })}
       {!current && (
-        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", alignSelf: "center", paddingLeft: 4 }}>
+        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.52)", alignSelf: "center", paddingLeft: 4 }}>
           Not assigned — tap to assign
         </span>
       )}
@@ -171,7 +171,7 @@ function DealBuilder({ client, onSave }: { client: Client; onSave: () => void })
   const labelStyle: React.CSSProperties = {
     fontSize: 11,
     fontWeight: 700,
-    color: "rgba(255,255,255,0.4)",
+    color: "rgba(255,255,255,0.85)",
     letterSpacing: "0.1em",
     textTransform: "uppercase",
     marginBottom: 6,
@@ -196,18 +196,18 @@ function DealBuilder({ client, onSave }: { client: Client; onSave: () => void })
               </span>
             ))}
             {suggestedExt && (
-              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", alignSelf: "center" }}>
+              <span style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", alignSelf: "center" }}>
                 Ext: {suggestedExt}
               </span>
             )}
             {suggestedInt.map((c: string) => (
-              <span key={c} style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", alignSelf: "center" }}>
+              <span key={c} style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", alignSelf: "center" }}>
                 Int: {c}
               </span>
             ))}
           </div>
           {client.mustHaveFeatures && (
-            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", marginTop: 8 }}>
+            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.68)", marginTop: 8 }}>
               Must-haves: {client.mustHaveFeatures}
             </p>
           )}
@@ -288,7 +288,7 @@ function DocPanel({ docs, clientId }: { docs: Document[]; clientId: string }) {
   });
 
   if (docs.length === 0) {
-    return <p style={{ fontSize: 13, color: "rgba(255,255,255,0.3)" }}>No documents uploaded yet.</p>;
+    return <p style={{ fontSize: 13, color: "rgba(255,255,255,0.52)" }}>No documents uploaded yet.</p>;
   }
 
   return (
@@ -316,7 +316,7 @@ function DocPanel({ docs, clientId }: { docs: Document[]; clientId: string }) {
             <p style={{ fontSize: 13, color: "white", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {DOC_LABELS[doc.docType] || doc.docType}
             </p>
-            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>
+            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.78)" }}>
               {doc.originalName} · {fmt(doc.fileSize)}
             </p>
           </div>
@@ -472,7 +472,7 @@ export default function ClientDetailPage() {
                   </span>
                 )}
               </div>
-              <p className="hidden sm:block" style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <p className="hidden sm:block" style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {client.email} · {client.phone}
                 {client.city && ` · ${client.city}, ${client.state}`}
               </p>
@@ -579,7 +579,7 @@ export default function ClientDetailPage() {
                         </div>
                       );
                     })}
-                    <p style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", marginTop: 4, textAlign: "right" }}>
+                    <p style={{ fontSize: 10, color: "rgba(255,255,255,0.68)", marginTop: 4, textAlign: "right" }}>
                       {docs.filter(d => ["drivers_license_front","drivers_license_back","proof_of_insurance","insurance_id_card"].includes(d.docType)).length} / 4 uploaded
                     </p>
                   </div>
@@ -597,7 +597,7 @@ export default function ClientDetailPage() {
                 <div className="flex flex-col gap-3">
                   {preferredMakes.length > 0 && (
                     <div>
-                      <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Makes</p>
+                      <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.78)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Makes</p>
                       <div className="flex flex-wrap gap-1.5">
                         {preferredMakes.map((m: string) => <Pill key={m} label={m} />)}
                       </div>
@@ -605,7 +605,7 @@ export default function ClientDetailPage() {
                   )}
                   {bodyStyles.length > 0 && (
                     <div>
-                      <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Body Style</p>
+                      <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.78)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Body Style</p>
                       <div className="flex flex-wrap gap-1.5">
                         {bodyStyles.map((s: string) => <Pill key={s} label={s} />)}
                       </div>
@@ -634,7 +634,7 @@ export default function ClientDetailPage() {
               <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 1 1 4.93 19.07"/>
             </svg>
           }>
-            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 16 }}>
+            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginBottom: 16 }}>
               Complete this section to send the deal to Mike Minerva for sourcing. Pre-populated with client preferences — adjust as needed.
             </p>
             <DealBuilder client={client} onSave={refresh} />
@@ -697,7 +697,7 @@ export default function ClientDetailPage() {
                   </button>
                   <button onClick={() => setEditingNotes(false)}
                     className="px-4 py-2 rounded-xl text-sm font-bold"
-                    style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.6)", fontFamily: "Industry, sans-serif", minHeight: 44 }}>
+                    style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.82)", fontFamily: "Industry, sans-serif", minHeight: 44 }}>
                     Cancel
                   </button>
                 </div>
@@ -709,7 +709,7 @@ export default function ClientDetailPage() {
                 </p>
                 <button onClick={() => setEditingNotes(true)}
                   className="flex-shrink-0 px-3 py-2 rounded-lg text-xs font-bold"
-                  style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.5)", border: "1px solid rgba(255,255,255,0.1)", fontFamily: "Industry, sans-serif", minHeight: 38 }}>
+                  style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.92)", border: "1px solid rgba(255,255,255,0.1)", fontFamily: "Industry, sans-serif", minHeight: 38 }}>
                   Edit
                 </button>
               </div>
@@ -725,7 +725,7 @@ export default function ClientDetailPage() {
         <button
           onClick={() => navigate("/admin")}
           className="flex-1 flex flex-col items-center justify-center gap-1 transition-all"
-          style={{ color: "rgba(255,255,255,0.4)" }}
+          style={{ color: "rgba(255,255,255,0.85)" }}
           data-testid="tab-back-clients"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -751,7 +751,7 @@ export default function ClientDetailPage() {
         <button
           onClick={() => navigate(`/documents/${id}`)}
           className="flex-1 flex flex-col items-center justify-center gap-1 transition-all"
-          style={{ color: "rgba(255,255,255,0.4)" }}
+          style={{ color: "rgba(255,255,255,0.85)" }}
           data-testid="tab-docs"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

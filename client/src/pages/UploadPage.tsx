@@ -115,7 +115,7 @@ function DropZone({ docType, clientId, onUploaded }: { docType: string; clientId
       <div className="drop-zone p-5 flex flex-col items-center justify-center gap-2">
         <div className="w-6 h-6 border-2 rounded-full animate-spin"
           style={{ borderColor: "var(--miami-blue)", borderTopColor: "transparent" }} />
-        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>Uploading...</p>
+        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.92)" }}>Uploading...</p>
       </div>
     );
   }
@@ -181,7 +181,7 @@ function DropZone({ docType, clientId, onUploaded }: { docType: string; clientId
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
             <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
           </svg>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.55)", fontFamily: "Industry, sans-serif", letterSpacing: "0.05em" }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.78)", fontFamily: "Industry, sans-serif", letterSpacing: "0.05em" }}>
             Browse Files
           </span>
         </button>
@@ -201,10 +201,10 @@ function DropZone({ docType, clientId, onUploaded }: { docType: string; clientId
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
           <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
         </svg>
-        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
+        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.82)" }}>
           Drop file or <span style={{ color: "var(--miami-blue)" }}>click to browse</span>
         </p>
-        <p style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginTop: 3 }}>
+        <p style={{ fontSize: 10, color: "rgba(255,255,255,0.52)", marginTop: 3 }}>
           JPG, PNG, PDF — max 20MB
         </p>
       </div>
@@ -263,7 +263,7 @@ export default function UploadPage() {
         {client && (
           <div className="text-right">
             <p style={{ fontSize: 13, fontWeight: 700, color: "white" }}>{clientName}</p>
-            <p className="hidden sm:block" style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>{client.email}</p>
+            <p className="hidden sm:block" style={{ fontSize: 11, color: "rgba(255,255,255,0.92)" }}>{client.email}</p>
           </div>
         )}
       </header>
@@ -285,7 +285,7 @@ export default function UploadPage() {
                 {totalProgress}/{totalRequired} Required
               </span>
             </div>
-            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.65)", marginTop: 8 }}>
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", marginTop: 8 }}>
               Upload what you have now and come back any time to add more.
               Items marked ★ are required.
             </p>
@@ -329,7 +329,7 @@ export default function UploadPage() {
                       </span>
                     )}
                   </div>
-                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", marginBottom: 10 }}>{section.description}</p>
+                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.82)", marginBottom: 10 }}>{section.description}</p>
 
                   {/* Doc slots */}
                   <div className="flex flex-col gap-3">
@@ -355,7 +355,7 @@ export default function UploadPage() {
                                   )}
                                 </div>
                                 {"sublabel" in dt && dt.sublabel && (
-                                  <p style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>{dt.sublabel}</p>
+                                  <p style={{ fontSize: 11, color: "rgba(255,255,255,0.92)", marginTop: 2 }}>{dt.sublabel}</p>
                                 )}
                                 {isDone && (
                                   <p style={{ fontSize: 12, color: "var(--gelbgrun)", marginTop: 2 }}>
@@ -398,13 +398,13 @@ export default function UploadPage() {
                                     </div>
                                     <div className="min-w-0">
                                       <p style={{ fontSize: 12, color: "rgba(255,255,255,0.8)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{doc.originalName}</p>
-                                      <p style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>{formatBytes(doc.fileSize)}</p>
+                                      <p style={{ fontSize: 10, color: "rgba(255,255,255,0.85)" }}>{formatBytes(doc.fileSize)}</p>
                                     </div>
                                   </div>
                                   <button
                                     onClick={() => deleteMutation.mutate(doc.id)}
                                     data-testid={`btn-delete-doc-${doc.id}`}
-                                    style={{ color: "rgba(255,255,255,0.3)", fontSize: 20, lineHeight: 1, flexShrink: 0, minWidth: 36, minHeight: 36, display: "flex", alignItems: "center", justifyContent: "center" }}
+                                    style={{ color: "rgba(255,255,255,0.52)", fontSize: 20, lineHeight: 1, flexShrink: 0, minWidth: 36, minHeight: 36, display: "flex", alignItems: "center", justifyContent: "center" }}
                                     className="hover:text-red-400 transition-colors">×</button>
                                 </div>
                               ))}
@@ -445,7 +445,7 @@ export default function UploadPage() {
             )}
           </div>
 
-          <p className="hidden md:block text-center mt-4" style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>
+          <p className="hidden md:block text-center mt-4" style={{ fontSize: 12, color: "rgba(255,255,255,0.85)" }}>
             Your uploads are saved automatically. Log back in any time to continue.
           </p>
         </div>

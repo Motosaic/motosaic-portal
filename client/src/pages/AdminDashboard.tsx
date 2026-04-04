@@ -135,7 +135,7 @@ function MinervaSheetCard() {
           Open Minerva Sheet →
         </a>
       ) : (
-        <p style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>
+        <p style={{ fontSize: 11, color: "rgba(255,255,255,0.85)", marginBottom: 8 }}>
           No sheet yet. Click Sync to create it.
         </p>
       )}
@@ -191,7 +191,7 @@ function StatusBadge({ status }: { status: string }) {
 function StatCard({ label, value, sub }: { label: string; value: number; sub?: string }) {
   return (
     <div className="rounded-2xl p-4 md:p-5" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)" }}>
-      <p style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>{label}</p>
+      <p style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.85)", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>{label}</p>
       <p style={{ fontSize: 24, fontWeight: 900, color: "white" }}>{value}</p>
       {sub && <p style={{ fontSize: 11, color: "var(--miami-blue)", marginTop: 4 }}>{sub}</p>}
     </div>
@@ -302,7 +302,7 @@ export default function AdminDashboard() {
             </div>
             <div className="hidden lg:block">
               <h1 style={{ fontSize: 20, fontWeight: 900, color: "white" }}>Client Dashboard</h1>
-              <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>
+              <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)" }}>
                 {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
               </p>
             </div>
@@ -318,7 +318,7 @@ export default function AdminDashboard() {
                 disabled={reseedMutation.isPending}
                 data-testid="btn-seed-clients"
                 className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-all hover:opacity-90"
-                style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.7)", fontFamily: "Industry, sans-serif", border: "1px solid rgba(255,255,255,0.15)" }}>
+                style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.9)", fontFamily: "Industry, sans-serif", border: "1px solid rgba(255,255,255,0.15)" }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/>
                 </svg>
@@ -388,7 +388,7 @@ export default function AdminDashboard() {
             </div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-20">
-              <p style={{ fontSize: 15, color: "rgba(255,255,255,0.3)" }}>
+              <p style={{ fontSize: 15, color: "rgba(255,255,255,0.52)" }}>
                 {search || filterStatus !== "all" ? "No clients match your filter." : "No clients yet. Share the portal link to get started."}
               </p>
               {!search && filterStatus === "all" && (
@@ -438,9 +438,9 @@ export default function AdminDashboard() {
                         )}
                       </div>
                       <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>{client.email}</span>
-                        {client.phone && <span className="hidden sm:inline" style={{ fontSize: 12, color: "rgba(255,255,255,0.35)" }}>{client.phone}</span>}
-                        {client.city && <span className="hidden md:inline" style={{ fontSize: 12, color: "rgba(255,255,255,0.35)" }}>{client.city}, {client.state}</span>}
+                        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.68)" }}>{client.email}</span>
+                        {client.phone && <span className="hidden sm:inline" style={{ fontSize: 12, color: "rgba(255,255,255,0.78)" }}>{client.phone}</span>}
+                        {client.city && <span className="hidden md:inline" style={{ fontSize: 12, color: "rgba(255,255,255,0.78)" }}>{client.city}, {client.state}</span>}
                       </div>
                       {/* Doc pills — shown inline below name on mobile */}
                       <div className="flex items-center gap-1.5 mt-2 lg:hidden flex-wrap" onClick={e => e.stopPropagation()}>
@@ -477,7 +477,7 @@ export default function AdminDashboard() {
                         <p style={{ fontSize: 12, color: "var(--miami-blue)", fontWeight: 600 }}>{client.budget}</p>
                       )}
                       {client.purchaseType && (
-                        <p style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", textTransform: "capitalize" }}>{client.purchaseType}</p>
+                        <p style={{ fontSize: 11, color: "rgba(255,255,255,0.52)", textTransform: "capitalize" }}>{client.purchaseType}</p>
                       )}
                     </div>
 
@@ -519,7 +519,7 @@ export default function AdminDashboard() {
                         style={{
                           background: "rgba(255,255,255,0.08)",
                           border: "1px solid rgba(255,255,255,0.12)",
-                          color: "rgba(255,255,255,0.7)",
+                          color: "rgba(255,255,255,0.9)",
                           fontFamily: "Industry, sans-serif",
                           minHeight: 34,
                         }}>
@@ -539,7 +539,7 @@ export default function AdminDashboard() {
                           <button
                             onClick={() => setConfirmDeleteId(null)}
                             className="px-2 py-1.5 rounded-lg text-xs font-bold transition-all"
-                            style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.45)", border: "1px solid rgba(255,255,255,0.1)", fontFamily: "Industry, sans-serif" }}>
+                            style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.68)", border: "1px solid rgba(255,255,255,0.1)", fontFamily: "Industry, sans-serif" }}>
                             Cancel
                           </button>
                         </div>
@@ -573,7 +573,7 @@ export default function AdminDashboard() {
                       <span style={{ fontSize: 11, color: "var(--gelbgrun)" }}>Synced to Google Drive</span>
                       <a href={client.driveFolder} target="_blank" rel="noopener noreferrer"
                         onClick={e => e.stopPropagation()}
-                        style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginLeft: "auto" }}>
+                        style={{ fontSize: 11, color: "rgba(255,255,255,0.78)", marginLeft: "auto" }}>
                         Open folder →
                       </a>
                     </div>
@@ -608,7 +608,7 @@ export default function AdminDashboard() {
         <button
           onClick={() => navigate("/intake")}
           className="flex-1 flex flex-col items-center justify-center gap-1 transition-all"
-          style={{ color: "rgba(255,255,255,0.35)" }}
+          style={{ color: "rgba(255,255,255,0.78)" }}
           data-testid="tab-new-client"
         >
           <div className="w-9 h-9 rounded-full flex items-center justify-center"
@@ -617,14 +617,14 @@ export default function AdminDashboard() {
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
           </div>
-          <span style={{ fontSize: 10, fontWeight: 700, fontFamily: "Industry, sans-serif", letterSpacing: "0.06em", color: "rgba(255,255,255,0.35)" }}>New</span>
+          <span style={{ fontSize: 10, fontWeight: 700, fontFamily: "Industry, sans-serif", letterSpacing: "0.06em", color: "rgba(255,255,255,0.78)" }}>New</span>
         </button>
 
         {/* Portal tab */}
         <button
           onClick={() => navigate("/")}
           className="flex-1 flex flex-col items-center justify-center gap-1 transition-all"
-          style={{ color: "rgba(255,255,255,0.35)" }}
+          style={{ color: "rgba(255,255,255,0.78)" }}
           data-testid="tab-portal"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

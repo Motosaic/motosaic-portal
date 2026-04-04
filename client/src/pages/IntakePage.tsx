@@ -72,9 +72,9 @@ function PriorityRankingStep({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>
+        <p style={{ fontSize: 13, color: "rgba(255,255,255,0.92)", lineHeight: 1.5 }}>
           Tap a number to rate each factor 1–5 in importance to you.
-          <span style={{ color: "rgba(255,255,255,0.3)" }}> 1 = least important · 5 = most important</span>
+          <span style={{ color: "rgba(255,255,255,0.52)" }}> 1 = least important · 5 = most important</span>
         </p>
       </div>
 
@@ -152,7 +152,7 @@ function PriorityRankingStep({
           className="hidden md:flex flex-col gap-2"
           style={{ width: 180, flexShrink: 0, position: "sticky", top: 100 }}
         >
-          <p style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 2 }}>
+          <p style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.78)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 2 }}>
             Live Summary &mdash; {ranked.length}/{total} rated
           </p>
           {(["5","4","3","2","1","na"] as const).map((r) => {
@@ -177,20 +177,20 @@ function PriorityRankingStep({
                   }}>
                     {r === "na" ? "N/A" : `★ ${r}`}
                   </span>
-                  <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>
+                  <span style={{ fontSize: 10, color: "rgba(255,255,255,0.52)" }}>
                     {items.length > 0 ? `(${items.length})` : ""}
                   </span>
                 </div>
                 {items.length > 0 ? (
                   <div className="flex flex-col gap-0.5">
                     {items.map(item => (
-                      <span key={item} style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", lineHeight: 1.4 }}>
+                      <span key={item} style={{ fontSize: 10, color: "rgba(255,255,255,0.85)", lineHeight: 1.4 }}>
                         {item}
                       </span>
                     ))}
                   </div>
                 ) : (
-                  <span style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic" }}>none yet</span>
+                  <span style={{ fontSize: 10, color: "rgba(255,255,255,0.68)", fontStyle: "italic" }}>none yet</span>
                 )}
               </div>
             );
@@ -200,7 +200,7 @@ function PriorityRankingStep({
 
       {/* Mobile: live summary as compact horizontal strip */}
       <div className="md:hidden flex flex-col gap-2 mt-2">
-        <p style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+        <p style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.78)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
           Summary — {ranked.length}/{total} rated
         </p>
         <div className="flex gap-2 flex-wrap">
@@ -239,7 +239,7 @@ function PriorityRankingStep({
               <span style={{ fontSize: 11, fontWeight: 700, color: cfg.bg === "#ADF029" ? "#ADF029" : cfg.text, fontFamily: "Industry, sans-serif" }}>
                 {r === "na" ? "N/A" : `★ ${r} — `}
               </span>
-              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.6)" }}>{items.join(" · ")}</span>
+              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.82)" }}>{items.join(" · ")}</span>
             </div>
           );
         })}
@@ -386,7 +386,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
     <div>
       <label className="intake-label">
         {label}
-        {hint && <span style={{ fontWeight: 400, color: "rgba(255,255,255,0.6)", fontSize: 11, marginLeft: 6 }}>({hint})</span>}
+        {hint && <span style={{ fontWeight: 400, color: "rgba(255,255,255,0.82)", fontSize: 11, marginLeft: 6 }}>({hint})</span>}
       </label>
       {children}
     </div>
@@ -442,7 +442,7 @@ function TriStateFeatureChips({
   return (
     <div>
       {/* Hint */}
-      <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 4, marginBottom: 8, lineHeight: 1.5 }}>
+      <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 4, marginBottom: 8, lineHeight: 1.5 }}>
         Tap once for{" "}
         <span style={{ color: "var(--miami-blue)", fontWeight: 700 }}>Nice to Have</span>
         {" "}· tap again for{" "}
@@ -506,7 +506,7 @@ function TriStateFeatureChips({
       {hasSelections && (
         <div className="mt-4 rounded-xl p-4 flex flex-col gap-3"
           style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-          <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+          <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.85)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
             Your Selection
           </p>
 
@@ -669,7 +669,7 @@ function SectionDivider({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-3 my-1">
       <div className="flex-1 border-t" style={{ borderColor: "rgba(255,255,255,0.08)" }} />
-      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700 }}>{label}</span>
+      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.85)", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700 }}>{label}</span>
       <div className="flex-1 border-t" style={{ borderColor: "rgba(255,255,255,0.08)" }} />
     </div>
   );
@@ -838,8 +838,8 @@ export default function IntakePage() {
       {/* Header */}
       <header className="flex items-center justify-between px-4 md:px-8 py-4 md:py-5 border-b flex-shrink-0" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
         <MotoLogoFull height={30} />
-        <div style={{ color: "rgba(255,255,255,0.6)", fontSize: 12 }}>
-          {clientName && <span className="hidden sm:inline" style={{ color: "rgba(255,255,255,0.4)", marginRight: 8 }}>{clientName} ·</span>}
+        <div style={{ color: "rgba(255,255,255,0.82)", fontSize: 12 }}>
+          {clientName && <span className="hidden sm:inline" style={{ color: "rgba(255,255,255,0.85)", marginRight: 8 }}>{clientName} ·</span>}
           Step {step + 1}/{STEPS.length} — {STEPS[step].label}
         </div>
       </header>
@@ -853,7 +853,7 @@ export default function IntakePage() {
             <h1 style={{ fontSize: 20, fontWeight: 900, color: "white", marginBottom: 4 }} className="md:text-2xl">
               {STEPS[step].label} Information
             </h1>
-            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.65)" }}>
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.85)" }}>
               {step === 0 && "Your contact and registration details."}
               {step === 1 && "Help us understand your budget and financing goals."}
               {step === 2 && "What kind of vehicle are you looking for?"}
@@ -1034,7 +1034,7 @@ export default function IntakePage() {
 
                 {/* Costco membership */}
                 <Field label="Do you have a Costco membership?">
-                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 4, marginBottom: 8, lineHeight: 1.5 }}>
+                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 4, marginBottom: 8, lineHeight: 1.5 }}>
                     Costco members regularly receive exclusive discounts — worth checking before we begin.
                   </p>
                   <ToggleGroup
@@ -1061,9 +1061,9 @@ export default function IntakePage() {
                 <div>
                   <label className="intake-label">
                     What vehicles are currently in your household?
-                    <span style={{ fontWeight: 400, color: "rgba(255,255,255,0.6)", fontSize: 11, marginLeft: 6 }}>(year and make)</span>
+                    <span style={{ fontWeight: 400, color: "rgba(255,255,255,0.82)", fontSize: 11, marginLeft: 6 }}>(year and make)</span>
                   </label>
-                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 4, marginBottom: 8, lineHeight: 1.5 }}>
+                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 4, marginBottom: 8, lineHeight: 1.5 }}>
                     Existing brand ownership can unlock loyalty pricing.
                   </p>
                   {form.householdVehicles.length > 0 && (
@@ -1087,7 +1087,7 @@ export default function IntakePage() {
                           <button
                             type="button"
                             onClick={() => removeHouseholdVehicle(i)}
-                            style={{ color: "rgba(255,255,255,0.35)", fontSize: 20, minWidth: 36, minHeight: 36, flexShrink: 0 }}
+                            style={{ color: "rgba(255,255,255,0.78)", fontSize: 20, minWidth: 36, minHeight: 36, flexShrink: 0 }}
                             className="flex items-center justify-center hover:text-red-400 transition-colors"
                             data-testid={`btn-remove-hv-${i}`}
                           >×</button>
@@ -1155,7 +1155,7 @@ export default function IntakePage() {
                     </Field>
 
                     <Field label="Which seating configurations work for you?">
-                      <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 4, marginBottom: 6, lineHeight: 1.5 }}>
+                      <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 4, marginBottom: 6, lineHeight: 1.5 }}>
                         Captain's chairs in the middle row give you 6 seats (2+2+2) with a walk-through to the third row. A bench bumps it to 7 (2+3+2) or 8 (2+3+3) depending on the third row configuration. Third rows vary — some fit 2–3 adults comfortably, others are really only sized for kids.
                       </p>
                       <MultiSelect
@@ -1176,7 +1176,7 @@ export default function IntakePage() {
 
                     {form.suvNumChildren && form.suvNumChildren !== "0" && (
                       <Field label="Ages of children" hint="approximate is fine">
-                        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 4, marginBottom: 6, lineHeight: 1.5 }}>
+                        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 4, marginBottom: 6, lineHeight: 1.5 }}>
                           Helps us flag seating that fits a booster seat, child seat, or neither — especially important for third-row and captain's chair configurations.
                         </p>
                         <input
@@ -1202,7 +1202,7 @@ export default function IntakePage() {
 
                 {/* Powertrain preference */}
                 <Field label="What type of powertrain are you open to?">
-                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 4, marginBottom: 6, lineHeight: 1.5 }}>
+                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 4, marginBottom: 6, lineHeight: 1.5 }}>
                     Helps us understand whether EVs, plug-in hybrids, or traditional gas vehicles are worth exploring together.
                   </p>
                   <ToggleGroup
@@ -1215,7 +1215,7 @@ export default function IntakePage() {
 
                 {form.powertrain === "ev" && (
                   <Field label="Do you regularly drive more than 200 miles in a single day?">
-                    <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 4, marginBottom: 6, lineHeight: 1.5 }}>
+                    <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 4, marginBottom: 6, lineHeight: 1.5 }}>
                       Most EVs have a 200–300 mile range. If long daily drives are common, we'll focus on longer-range models or those with fast-charging networks along your routes.
                     </p>
                     <ToggleGroup
@@ -1230,7 +1230,7 @@ export default function IntakePage() {
                 {/* Brands section — renamed */}
                 <div>
                   <label className="intake-label">Love It or Leave It — Your Best &amp; Worst Brands</label>
-                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", marginTop: 4, marginBottom: 6, lineHeight: 1.5 }}>
+                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 4, marginBottom: 6, lineHeight: 1.5 }}>
                     Tap once for ✓ preferred (green) · tap again for ✕ not interested (red) · tap again to clear.
                     You don't have to weigh in on every brand — just the ones that matter to you.
                   </p>
@@ -1336,7 +1336,7 @@ export default function IntakePage() {
 
                 {!form.hasTradeIn && (
                   <div className="rounded-xl p-5 text-center" style={{ background: "rgba(31,195,239,0.06)", border: "1px solid rgba(31,195,239,0.15)" }}>
-                    <p style={{ color: "rgba(255,255,255,0.65)", fontSize: 14 }}>
+                    <p style={{ color: "rgba(255,255,255,0.85)", fontSize: 14 }}>
                       No trade-in — got it. After submitting, you'll be prompted to upload your key documents.
                     </p>
                   </div>
@@ -1361,7 +1361,7 @@ export default function IntakePage() {
                 className="flex-1 py-3 rounded-xl font-bold transition-all"
                 style={{
                   background: "rgba(255,255,255,0.08)",
-                  color: "rgba(255,255,255,0.7)",
+                  color: "rgba(255,255,255,0.9)",
                   border: "1px solid rgba(255,255,255,0.12)",
                   fontSize: 14,
                   fontFamily: "Industry, sans-serif",
@@ -1381,7 +1381,7 @@ export default function IntakePage() {
             </button>
           </div>
 
-          <p className="hidden md:block text-center mt-4" style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>
+          <p className="hidden md:block text-center mt-4" style={{ fontSize: 12, color: "rgba(255,255,255,0.85)" }}>
             Your progress is saved automatically. You can return at any time.
           </p>
         </div>
@@ -1399,7 +1399,7 @@ export default function IntakePage() {
               className="rounded-xl font-bold transition-all active:scale-95"
               style={{
                 background: "rgba(255,255,255,0.08)",
-                color: "rgba(255,255,255,0.7)",
+                color: "rgba(255,255,255,0.9)",
                 border: "1px solid rgba(255,255,255,0.12)",
                 fontSize: 15,
                 fontFamily: "Industry, sans-serif",
@@ -1425,7 +1425,7 @@ export default function IntakePage() {
             {mutation.isPending ? "Saving..." : step === STEPS.length - 1 ? "Save & Continue →" : `Continue to ${STEPS[Math.min(step + 1, STEPS.length - 1)].label} →`}
           </button>
         </div>
-        <p className="text-center mt-2" style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>
+        <p className="text-center mt-2" style={{ fontSize: 11, color: "rgba(255,255,255,0.78)" }}>
           Progress saved automatically
         </p>
       </div>

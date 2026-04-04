@@ -40,7 +40,7 @@ export default function LandingPage() {
         <h1 style={{ fontSize: 28, fontWeight: 900, color: "white", lineHeight: 1.2, marginBottom: 16 }}>
           Your Car Buying Journey Starts Here
         </h1>
-        <p style={{ fontSize: 15, color: "rgba(255,255,255,0.6)", lineHeight: 1.7, marginBottom: 40 }}>
+        <p style={{ fontSize: 15, color: "rgba(255,255,255,0.82)", lineHeight: 1.7, marginBottom: 40 }}>
           Complete your intake form and upload your documents — we'll take it from there. The Motosaic team handles everything so you drive away in the right car at the right price.
         </p>
 
@@ -63,7 +63,7 @@ export default function LandingPage() {
         </div>
 
         {/* Trust indicators */}
-        <div className="flex items-center justify-center gap-6 mt-10" style={{ color: "rgba(255,255,255,0.35)", fontSize: 12 }}>
+        <div className="flex items-center justify-center gap-6 mt-10" style={{ color: "rgba(255,255,255,0.78)", fontSize: 12 }}>
           <span className="flex items-center gap-2">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
