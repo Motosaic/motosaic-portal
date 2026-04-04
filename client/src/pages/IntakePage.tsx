@@ -13,7 +13,240 @@ const STEPS = [
   { label: "Budget", icon: "💰" },
   { label: "Vehicle", icon: "🚗" },
   { label: "Trade-In", icon: "🔄" },
+  { label: "Priorities", icon: "⭐" },
 ];
+
+// ─── Priority Ranking config ─────────────────────────────────────────────────────
+
+export const PRIORITY_CATEGORIES = [
+  "Interior Comfort & Luxury",
+  "Exterior Style",
+  "Sporty Drive / Handling",
+  "Engine Power / Speed",
+  "Efficiency (Gas Mileage / EV Range)",
+  "Technology",
+  "Safety",
+  "Maintenance / Cost of Ownership",
+  "Space / Storage",
+  "Resale Value",
+  "Warranty Coverage Beyond 3 Years",
+  "Towing / Hauling Capability",
+  "Off-Road Capability",
+  "Brand Prestige / Status",
+  "Third Row Space",             // N/A-eligible — kept last
+];
+
+// Ranks: 1 = lowest, 5 = highest importance. "na" = not applicable.
+export type PriorityRank = 1 | 2 | 3 | 4 | 5 | "na";
+export type PriorityRankings = Record<string, PriorityRank>;
+
+const RANK_COLORS: Record<string | number, { bg: string; text: string; label: string }> = {
+  1: { bg: "#374151",  text: "#9ca3af", label: "1" },  // grey — lowest
+  2: { bg: "#1d4ed8",  text: "#bfdbfe", label: "2" },  // blue
+  3: { bg: "#0369a1",  text: "#7dd3fc", label: "3" },  // sky blue (Miami Blue family)
+  4: { bg: "#15803d",  text: "#bbf7d0", label: "4" },  // green
+  5: { bg: "#ADF029",  text: "#001f30", label: "5" },  // Gelbgrün — highest
+  na:{ bg: "#1e293b",  text: "rgba(255,255,255,0.35)", label: "N/A" },
+};
+
+function PriorityRankingStep({
+  rankings,
+  onChange,
+}: {
+  rankings: PriorityRankings;
+  onChange: (r: PriorityRankings) => void;
+}) {
+  const setRank = (cat: string, rank: PriorityRank) => {
+    onChange({ ...rankings, [cat]: rank });
+  };
+
+  // Live buckets: group categories by their selected rank
+  const buckets: Record<string, string[]> = { "5": [], "4": [], "3": [], "2": [], "1": [], na: [] };
+  for (const cat of PRIORITY_CATEGORIES) {
+    const r = rankings[cat];
+    if (r != null) buckets[String(r)].push(cat);
+  }
+  const ranked = PRIORITY_CATEGORIES.filter(c => rankings[c] != null);
+  const total  = PRIORITY_CATEGORIES.length;
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>
+          Tap a number to rate each factor 1–5 in importance to you.
+          <span style={{ color: "rgba(255,255,255,0.3)" }}> 1 = least important · 5 = most important</span>
+        </p>
+      </div>
+
+      {/* Main layout: table left, live summary right */}
+      <div className="flex gap-4 items-start">
+
+        {/* ── Left: category chip rows */}
+        <div className="flex-1 flex flex-col gap-2 min-w-0">
+          {PRIORITY_CATEGORIES.map((cat) => {
+            const selected = rankings[cat];
+            const isThirdRow = cat === "Third Row Space";
+            const ranks: PriorityRank[] = isThirdRow
+              ? [1, 2, 3, 4, 5, "na"]
+              : [1, 2, 3, 4, 5];
+
+            return (
+              <div key={cat} className="flex flex-col gap-1">
+                {isThirdRow && (
+                  <div style={{ height: 1, background: "rgba(255,255,255,0.08)", margin: "4px 0 6px" }} />
+                )}
+                <div className="flex items-center gap-2">
+                  {/* Category label */}
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: selected != null ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.5)",
+                      fontFamily: "Industry, sans-serif",
+                      fontWeight: selected != null ? 600 : 400,
+                      width: 180,
+                      flexShrink: 0,
+                      lineHeight: 1.3,
+                    }}
+                  >
+                    {cat}
+                  </span>
+
+                  {/* Rank chips */}
+                  <div className="flex gap-1 flex-wrap">
+                    {ranks.map((rank) => {
+                      const active = selected === rank;
+                      const cfg = RANK_COLORS[rank];
+                      return (
+                        <button
+                          key={rank}
+                          type="button"
+                          onClick={() => setRank(cat, rank)}
+                          style={{
+                            minWidth: rank === "na" ? 38 : 30,
+                            height: 30,
+                            borderRadius: 8,
+                            border: active ? "none" : "1px solid rgba(255,255,255,0.12)",
+                            background: active ? cfg.bg : "rgba(255,255,255,0.05)",
+                            color: active ? cfg.text : "rgba(255,255,255,0.35)",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            fontFamily: "Industry, sans-serif",
+                            cursor: "pointer",
+                            transition: "all 0.12s",
+                            letterSpacing: "0.03em",
+                          }}
+                        >
+                          {cfg.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Right: live bucket summary (desktop) */}
+        <div
+          className="hidden md:flex flex-col gap-2"
+          style={{ width: 180, flexShrink: 0, position: "sticky", top: 100 }}
+        >
+          <p style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 2 }}>
+            Live Summary &mdash; {ranked.length}/{total} rated
+          </p>
+          {(["5","4","3","2","1","na"] as const).map((r) => {
+            const cfg = RANK_COLORS[r];
+            const items = buckets[r];
+            return (
+              <div key={r}
+                style={{
+                  borderRadius: 10,
+                  border: `1px solid ${items.length > 0 ? cfg.bg : "rgba(255,255,255,0.06)"}`,
+                  background: items.length > 0 ? `${cfg.bg}22` : "rgba(255,255,255,0.03)",
+                  padding: "8px 10px",
+                  transition: "all 0.2s",
+                }}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span style={{
+                    fontSize: 11, fontWeight: 700,
+                    color: items.length > 0 ? cfg.bg : "rgba(255,255,255,0.2)",
+                    fontFamily: "Industry, sans-serif",
+                    minWidth: 26,
+                  }}>
+                    {r === "na" ? "N/A" : `★ ${r}`}
+                  </span>
+                  <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>
+                    {items.length > 0 ? `(${items.length})` : ""}
+                  </span>
+                </div>
+                {items.length > 0 ? (
+                  <div className="flex flex-col gap-0.5">
+                    {items.map(item => (
+                      <span key={item} style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", lineHeight: 1.4 }}>
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <span style={{ fontSize: 10, color: "rgba(255,255,255,0.2)", fontStyle: "italic" }}>none yet</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Mobile: live summary as compact horizontal strip */}
+      <div className="md:hidden flex flex-col gap-2 mt-2">
+        <p style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.35)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+          Summary — {ranked.length}/{total} rated
+        </p>
+        <div className="flex gap-2 flex-wrap">
+          {(["5","4","3","2","1","na"] as const).map((r) => {
+            const cfg = RANK_COLORS[r];
+            const items = buckets[r];
+            if (!items.length) return null;
+            return (
+              <div key={r} style={{
+                borderRadius: 8,
+                background: `${cfg.bg}33`,
+                border: `1px solid ${cfg.bg}`,
+                padding: "4px 8px",
+                fontSize: 10,
+                color: cfg.text,
+                fontWeight: 600,
+                fontFamily: "Industry, sans-serif",
+              }}>
+                {r === "na" ? "N/A" : `★${r}`}: {items.length}
+              </div>
+            );
+          })}
+        </div>
+        {/* Expanded on mobile */}
+        {(["5","4","3","2","1","na"] as const).map((r) => {
+          const cfg = RANK_COLORS[r];
+          const items = buckets[r];
+          if (!items.length) return null;
+          return (
+            <div key={r} style={{
+              borderRadius: 8,
+              background: `${cfg.bg}18`,
+              border: `1px solid ${cfg.bg}55`,
+              padding: "6px 10px",
+            }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: cfg.bg === "#ADF029" ? "#ADF029" : cfg.text, fontFamily: "Industry, sans-serif" }}>
+                {r === "na" ? "N/A" : `★ ${r} — `}
+              </span>
+              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.6)" }}>{items.join(" · ")}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 type HouseholdVehicle = { year: string; make: string };
 
@@ -41,6 +274,8 @@ type FormData = {
   // Step 4
   hasTradeIn: boolean; tradeYear: string; tradeMake: string; tradeModel: string;
   tradeTrim: string; tradeMileage: string; tradeCondition: string; tradeOwed: string;
+  // Step 5
+  priorityRankings: PriorityRankings;
 };
 
 const initial: FormData = {
@@ -57,6 +292,7 @@ const initial: FormData = {
   powertrain: "", evLongRange: "",
   hasTradeIn: false, tradeYear: "", tradeMake: "", tradeModel: "", tradeTrim: "",
   tradeMileage: "", tradeCondition: "", tradeOwed: "",
+  priorityRankings: {},
 };
 
 const BODY_STYLES = ["Sedan", "SUV", "Truck", "Crossover", "Coupe", "Van/Minivan", "Convertible", "Wagon"];
@@ -467,7 +703,7 @@ export default function IntakePage() {
     staleTime: 30000,
   });
 
-  // Pre-populate firstName/lastName from existing client record when first loaded
+  // Pre-populate form from existing client record when first loaded
   const [namePrefilled, setNamePrefilled] = useState(false);
   if (existingClient && !namePrefilled) {
     if (existingClient.firstName || existingClient.lastName) {
@@ -475,6 +711,12 @@ export default function IntakePage() {
         ...prev,
         firstName: prev.firstName || existingClient.firstName || "",
         lastName: prev.lastName || existingClient.lastName || "",
+        priorityRankings: Object.keys(prev.priorityRankings).length === 0
+          ? (() => {
+              try { return JSON.parse((existingClient as any).priorityRankings || "{}"); }
+              catch { return {}; }
+            })()
+          : prev.priorityRankings,
       }));
     }
     setNamePrefilled(true);
@@ -510,6 +752,7 @@ export default function IntakePage() {
         householdVehicles: JSON.stringify(data.householdVehicles),
         mustHaveFeatures: buildFeatureString(mustHaveFromState, featureOther),
         niceToHaveFeatures: buildFeatureString(niceToHaveFromState, ""),
+        priorityRankings: JSON.stringify(data.priorityRankings),
       };
       await apiRequest("PATCH", `/api/clients/${clientId}/questionnaire`, payload);
       const res = await apiRequest("POST", `/api/clients/${clientId}/questionnaire-complete`);
@@ -535,6 +778,7 @@ export default function IntakePage() {
       householdVehicles: JSON.stringify(data.householdVehicles),
       mustHaveFeatures: buildFeatureString(mustHaveFromState, featureOther),
       niceToHaveFeatures: buildFeatureString(niceToHaveFromState, ""),
+      priorityRankings: JSON.stringify(data.priorityRankings),
     };
     apiRequest("PATCH", `/api/clients/${clientId}/questionnaire`, payload).catch(() => {});
   };
@@ -614,6 +858,7 @@ export default function IntakePage() {
               {step === 1 && "Help us understand your budget and financing goals."}
               {step === 2 && "What kind of vehicle are you looking for?"}
               {step === 3 && "Do you have a vehicle to trade in?"}
+              {step === 4 && "What matters most to you in a vehicle?"}
             </p>
           </div>
 
@@ -1021,7 +1266,7 @@ export default function IntakePage() {
             )}
 
             {/* ── Step 4: Trade-In ── */}
-            {step === 3 && (
+            {step === 3 && ( // eslint-disable-line no-constant-binary-expression
               <div className="flex flex-col gap-5">
                 <Field label="Do you have a vehicle to trade in?">
                   <div className="flex gap-2 mt-1">
@@ -1096,6 +1341,15 @@ export default function IntakePage() {
                     </p>
                   </div>
                 )}
+              </div>
+            )}
+            {/* ── Step 5: Priority Rankings ── */}
+            {step === 4 && (
+              <div className="flex flex-col gap-5">
+                <PriorityRankingStep
+                  rankings={form.priorityRankings}
+                  onChange={(r) => set("priorityRankings", r)}
+                />
               </div>
             )}
           </div>

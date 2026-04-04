@@ -98,6 +98,7 @@ addColumnIfMissing("clients", "household_vehicles", "TEXT");
 addColumnIfMissing("clients", "suv_max_seating", "TEXT");
 addColumnIfMissing("clients", "powertrain", "TEXT");
 addColumnIfMissing("clients", "ev_long_range", "TEXT");
+addColumnIfMissing("clients", "priority_rankings", "TEXT");
 
 export interface IStorage {
   // Clients

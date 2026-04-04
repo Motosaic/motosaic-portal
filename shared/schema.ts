@@ -43,6 +43,8 @@ export const clients = sqliteTable("clients", {
   householdVehicles: text("household_vehicles"),     // JSON array of {year, make}
   powertrain: text("powertrain"),                    // "ev" | "phev" | "gas" | "indifferent"
   evLongRange: text("ev_long_range"),                // "yes" | "no"
+  // Priority Rankings — JSON: { category: string, rank: 1|2|3|4|5|"na" }[]
+  priorityRankings: text("priority_rankings"),
   // Trade-In
   hasTradeIn: integer("has_trade_in", { mode: "boolean" }).default(false),
   tradeYear: text("trade_year"),

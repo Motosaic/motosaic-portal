@@ -215,7 +215,25 @@ export async function generateQuestionnairePDF(client: Client): Promise<Buffer> 
     if (client.niceToHaveFeatures) row("Nice-to-Have", client.niceToHaveFeatures);
     divider();
 
-    // ── 4. Lifestyle & Background
+    // ── 4. Priority Rankings
+    const rawRankings = (client as any).priorityRankings;
+    if (rawRankings) {
+      try {
+        const rankings: Record<string, string | number> = JSON.parse(rawRankings);
+        const sorted = Object.entries(rankings)
+          .sort(([,a],[,b]) => (b === "na" ? -1 : a === "na" ? 1 : Number(b) - Number(a)));
+        if (sorted.length > 0) {
+          section("Priorities (1=Low, 5=High)");
+          for (const [cat, rank] of sorted) {
+            const label = rank === "na" ? "N/A" : `${'★'.repeat(Number(rank))} (${rank}/5)`;
+            row(cat, label, Number(rank) === 5);
+          }
+          divider();
+        }
+      } catch { /* skip if malformed */ }
+    }
+
+    // ── 5. Lifestyle & Background
     const costco    = (client as any).costcoMembership;
     const veteran   = (client as any).isVeteran;
     const household = parseJson((client as any).householdVehicles);
