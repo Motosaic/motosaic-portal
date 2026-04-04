@@ -783,8 +783,10 @@ export default function IntakePage() {
     apiRequest("PATCH", `/api/clients/${clientId}/questionnaire`, payload).catch(() => {});
   };
 
+  const [showHvError, setShowHvError] = useState(false);
+
   const validateStep = () => {
-    if (isUAT) return true; // UAT mode — skip all validation
+    if (isUAT) return true;
     if (step === 0) return true;
     if (step === 1) {
       if (!form.purchaseType) return false;
@@ -795,16 +797,30 @@ export default function IntakePage() {
   };
 
   const next = () => {
+    // Strip any completely-empty household vehicle rows before validating/saving
+    const cleanedVehicles = form.householdVehicles.filter(v => v.year.trim() || v.make.trim());
+    if (cleanedVehicles.length !== form.householdVehicles.length) {
+      set("householdVehicles", cleanedVehicles);
+    }
+    // Check for partially-filled rows (one field filled but not the other)
+    const incomplete = cleanedVehicles.some(v => !v.year.trim() || !v.make.trim());
+    if (incomplete) {
+      setShowHvError(true);
+      toast({ title: "Incomplete vehicle", description: "Please fill in both year and make, or remove the row.", variant: "destructive" });
+      return;
+    }
+    setShowHvError(false);
     if (!validateStep()) {
       toast({ title: "Please fill required fields", description: "Complete the highlighted fields before continuing.", variant: "destructive" });
       return;
     }
     if (step < STEPS.length - 1) {
-      saveProgress(form);
+      // Save with cleaned vehicles
+      saveProgress({ ...form, householdVehicles: cleanedVehicles });
       setStep(s => s + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
-      mutation.mutate(form);
+      mutation.mutate({ ...form, householdVehicles: cleanedVehicles });
     }
   };
 
@@ -826,8 +842,12 @@ export default function IntakePage() {
   // ── Household vehicles helpers ──
   const addHouseholdVehicle = () =>
     set("householdVehicles", [...form.householdVehicles, { year: "", make: "" }]);
-  const removeHouseholdVehicle = (i: number) =>
-    set("householdVehicles", form.householdVehicles.filter((_, idx) => idx !== i));
+  const removeHouseholdVehicle = (i: number) => {
+    const updated = form.householdVehicles.filter((_, idx) => idx !== i);
+    set("householdVehicles", updated);
+    // Clear any validation toast that may have fired before the row was removed
+    setShowHvError(false);
+  };
   const updateHouseholdVehicle = (i: number, field: "year" | "make", value: string) => {
     const updated = form.householdVehicles.map((v, idx) => idx === i ? { ...v, [field]: value } : v);
     set("householdVehicles", updated);
@@ -1068,21 +1088,25 @@ export default function IntakePage() {
                   </p>
                   {form.householdVehicles.length > 0 && (
                     <div className="flex flex-col gap-2 mb-3">
-                      {form.householdVehicles.map((v, i) => (
+                      {form.householdVehicles.map((v, i) => {
+                        const rowIncomplete = showHvError && (!v.year.trim() || !v.make.trim());
+                        return (
                         <div key={i} className="flex gap-2 items-center">
                           <input
                             className="intake-input flex-1"
                             placeholder="Year (e.g. 2019)"
                             value={v.year}
-                            onChange={e => updateHouseholdVehicle(i, "year", e.target.value)}
+                            onChange={e => { updateHouseholdVehicle(i, "year", e.target.value); setShowHvError(false); }}
                             data-testid={`input-hv-year-${i}`}
+                            style={rowIncomplete && !v.year.trim() ? { borderColor: "#ef4444" } : {}}
                           />
                           <input
                             className="intake-input flex-1"
                             placeholder="Make (e.g. Toyota)"
                             value={v.make}
-                            onChange={e => updateHouseholdVehicle(i, "make", e.target.value)}
+                            onChange={e => { updateHouseholdVehicle(i, "make", e.target.value); setShowHvError(false); }}
                             data-testid={`input-hv-make-${i}`}
+                            style={rowIncomplete && !v.make.trim() ? { borderColor: "#ef4444" } : {}}
                           />
                           <button
                             type="button"
@@ -1092,7 +1116,8 @@ export default function IntakePage() {
                             data-testid={`btn-remove-hv-${i}`}
                           >×</button>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                   <button
