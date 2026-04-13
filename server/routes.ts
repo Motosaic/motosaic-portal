@@ -7,6 +7,7 @@ import { storage } from "./storage";
 import { insertClientSchema, insertDocumentSchema } from "@shared/schema";
 import { z } from "zod";
 import { getAuthUrl, exchangeCodeForTokens, syncClientToDrive, syncMinervaSheet, getStoredSheetUrl } from "./drive";
+import { sendQuestionnaireCompleteEmail } from "./email";
 
 const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(process.cwd(), "uploads");
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -375,24 +376,27 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(updated);
   });
 
-  // Mark questionnaire complete + auto-sync to Drive + sheet
+  // Mark questionnaire complete + auto-sync to Drive + sheet + email notification
   app.post("/api/clients/:id/questionnaire-complete", async (req, res) => {
     const id = parseInt(req.params.id);
     const client = storage.markQuestionnaireComplete(id);
     if (!client) return res.status(404).json({ message: "Client not found" });
     res.json(client);
-    // Fire-and-forget Drive sync (don't block the response)
-    if (process.env.GOOGLE_REFRESH_TOKEN) {
-      try {
-        const docs = storage.getDocumentsByClient(id);
-        const folderUrl = await syncClientToDrive(client, docs, UPLOADS_DIR);
-        storage.updateClientDriveFolder(id, folderUrl);
-      } catch (err) {
-        console.error("Drive sync failed:", err);
+    // Fire-and-forget: Drive sync + Minerva sheet + notification email
+    (async () => {
+      if (process.env.GOOGLE_REFRESH_TOKEN) {
+        try {
+          const docs = storage.getDocumentsByClient(id);
+          const folderUrl = await syncClientToDrive(client, docs, UPLOADS_DIR);
+          storage.updateClientDriveFolder(id, folderUrl);
+        } catch (err) {
+          console.error("[drive] Sync failed:", err);
+        }
+        triggerSheetSync();
       }
-      // Trigger Minerva sheet update
-      triggerSheetSync();
-    }
+      // Send notification email (non-blocking, uses same Google OAuth)
+      await sendQuestionnaireCompleteEmail(client);
+    })();
   });
 
   // ─── Documents ──────────────────────────────────────────────────────────
