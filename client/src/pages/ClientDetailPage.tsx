@@ -30,6 +30,34 @@ const DOC_LABELS: Record<string, string> = {
   other:                     "Other Document",
 };
 
+// ─── Priority ranking config (mirrors IntakePage) ───────────────────────────
+const PRIORITY_CATEGORIES = [
+  "Interior Comfort & Luxury",
+  "Exterior Style",
+  "Sporty Drive / Handling",
+  "Engine Power / Speed",
+  "Efficiency (Gas Mileage / EV Range)",
+  "Technology",
+  "Safety",
+  "Maintenance / Cost of Ownership",
+  "Space / Storage",
+  "Resale Value",
+  "Warranty Coverage Beyond 3 Years",
+  "Towing / Hauling Capability",
+  "Off-Road Capability",
+  "Brand Prestige / Status",
+  "Third Row Space",
+];
+
+const RANK_COLORS: Record<string | number, { bg: string; text: string; label: string }> = {
+  1: { bg: "#374151",  text: "#9ca3af",  label: "1" },
+  2: { bg: "#1d4ed8",  text: "#bfdbfe",  label: "2" },
+  3: { bg: "#0369a1",  text: "#7dd3fc",  label: "3" },
+  4: { bg: "#15803d",  text: "#bbf7d0",  label: "4" },
+  5: { bg: "#ADF029",  text: "#001f30",  label: "5" },
+  na: { bg: "#1e293b", text: "rgba(255,255,255,0.35)", label: "N/A" },
+};
+
 // ─── Small helpers ────────────────────────────────────────────────────────────
 function parseJson(str?: string | null): string[] {
   try { return JSON.parse(str || "[]"); } catch { return []; }
@@ -394,9 +422,16 @@ export default function ClientDetailPage() {
     );
   }
 
-  const bodyStyles    = parseJson(client.bodyStyles);
-  const preferredMakes = parseJson(client.preferredMakes);
-  const intColors     = parseJson(client.interiorColors);
+  const bodyStyles       = parseJson(client.bodyStyles);
+  const preferredMakes   = parseJson(client.preferredMakes);
+  const notInterestedMakes = parseJson(client.notInterestedMakes);
+  const intColors        = parseJson(client.interiorColors);
+  const householdVehicles: Array<{ year?: string; make?: string; model?: string; trim?: string }> = (() => {
+    try { return JSON.parse(client.householdVehicles || "[]"); } catch { return []; }
+  })();
+  const priorityRankings: Record<string, string | number> = (() => {
+    try { return JSON.parse(client.priorityRankings || "{}"); } catch { return {}; }
+  })();
   const assignedAgent = AGENTS.find(a => a.key === client.assignedTo);
   const dealComplete  = !!(client.finalMake && client.finalModel);
 
@@ -620,15 +655,145 @@ export default function ClientDetailPage() {
                   {client.mustHaveFeatures && (
                     <Row label="Must-Have" value={client.mustHaveFeatures} />
                   )}
+                  {client.niceToHaveFeatures && (
+                    <Row label="Nice-to-Have" value={client.niceToHaveFeatures} />
+                  )}
                   {client.preferredModels && (
                     <Row label="Models" value={client.preferredModels} />
+                  )}
+                  {notInterestedMakes.length > 0 && (
+                    <div>
+                      <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.78)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Not Interested</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {notInterestedMakes.map((m: string) => (
+                          <span key={m} className="px-2.5 py-1 rounded-lg text-xs font-bold"
+                            style={{ background: "rgba(239,68,68,0.12)", color: "#f87171", border: "1px solid rgba(239,68,68,0.2)" }}>
+                            {m}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <Row label="Powertrain" value={client.powertrain} />
+                  {client.powertrain?.toLowerCase().includes("ev") || client.powertrain?.toLowerCase().includes("electric") ? (
+                    <Row label="EV Long Range" value={client.evLongRange ? "Yes" : "No"} />
+                  ) : null}
+                  <Row label="Annual Miles" value={client.annualMileage} />
+                  <Row label="Passengers" value={client.passengerCount} />
+                  {client.suvSeatConfig && <Row label="SUV Seats" value={client.suvSeatConfig} />}
+                  {client.suvMaxSeating && <Row label="Max Seating" value={client.suvMaxSeating} />}
+                  {client.suvNumChildren && <Row label="# Children" value={String(client.suvNumChildren)} />}
+                  {client.suvChildAges && <Row label="Child Ages" value={client.suvChildAges} />}
+                  {client.suvHasPets !== undefined && client.suvHasPets !== null && (
+                    <Row label="Has Pets" value={client.suvHasPets ? "Yes" : "No"} />
                   )}
                 </div>
               </SectionCard>
             </div>
           </div>
 
-          {/* ── 3. FINAL DEAL BUILD ── */}
+          {/* ── 3. LIFESTYLE & PERKS ── */}
+          {(client.costcoMembership || client.isVeteran || householdVehicles.filter(v => v.year || v.make || v.model).length > 0) && (
+            <SectionCard title="Lifestyle & Perks" icon={
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+              </svg>
+            }>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+                <div>
+                  <Row label="Costco Member" value={client.costcoMembership ? "Yes" : undefined} />
+                  <Row label="Veteran" value={client.isVeteran ? "Yes" : undefined} />
+                </div>
+              </div>
+              {householdVehicles.filter(v => v.year || v.make || v.model).length > 0 && (
+                <div className="mt-3">
+                  <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.78)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>Household Vehicles</p>
+                  <div className="flex flex-col gap-2">
+                    {householdVehicles.filter(v => v.year || v.make || v.model).map((v, i) => (
+                      <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                        style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.52)", minWidth: 20 }}>#{i + 1}</span>
+                        <span style={{ fontSize: 13, color: "rgba(255,255,255,0.82)" }}>
+                          {[v.year, v.make, v.model, v.trim].filter(Boolean).join(" ")}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </SectionCard>
+          )}
+
+          {/* ── 4. PRIORITY RANKINGS ── */}
+          {Object.keys(priorityRankings).length > 0 && (
+            <SectionCard title="Priority Rankings" accent="rgba(173,240,41,0.2)" icon={
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ADF029" strokeWidth="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+              </svg>
+            }>
+              <div className="flex flex-col gap-2">
+                {/* Group by rank for easy scanning */}
+                {([5,4,3,2,1] as const).map(rank => {
+                  const cats = PRIORITY_CATEGORIES.filter(c => priorityRankings[c] === rank);
+                  if (cats.length === 0) return null;
+                  const rc = RANK_COLORS[rank];
+                  return (
+                    <div key={rank} className="flex items-start gap-3">
+                      <span className="flex-shrink-0 px-2 py-0.5 rounded-md text-xs font-black"
+                        style={{ background: rc.bg, color: rc.text, minWidth: 28, textAlign: "center" }}>
+                        {rank}
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {cats.map(c => (
+                          <span key={c} className="px-2.5 py-1 rounded-lg text-xs font-semibold"
+                            style={{ background: `${rc.bg}33`, color: rc.text, border: `1px solid ${rc.bg}88` }}>
+                            {c}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+                {/* N/A row */}
+                {(() => {
+                  const naCats = PRIORITY_CATEGORIES.filter(c => priorityRankings[c] === "na");
+                  if (naCats.length === 0) return null;
+                  const rc = RANK_COLORS["na"];
+                  return (
+                    <div className="flex items-start gap-3">
+                      <span className="flex-shrink-0 px-2 py-0.5 rounded-md text-xs font-black"
+                        style={{ background: rc.bg, color: rc.text, minWidth: 28, textAlign: "center" }}>
+                        N/A
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {naCats.map(c => (
+                          <span key={c} className="px-2.5 py-1 rounded-lg text-xs font-semibold"
+                            style={{ background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.35)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                            {c}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+              {/* Legend */}
+              <div className="flex items-center gap-3 mt-4 pt-3 flex-wrap" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.52)", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>Scale:</span>
+                {([1,2,3,4,5] as const).map(r => {
+                  const rc = RANK_COLORS[r];
+                  return (
+                    <span key={r} className="px-2 py-0.5 rounded text-xs font-bold"
+                      style={{ background: rc.bg, color: rc.text }}>
+                      {r} {r === 1 ? "— Low" : r === 5 ? "— High" : ""}
+                    </span>
+                  );
+                })}
+              </div>
+            </SectionCard>
+          )}
+
+          {/* ── 5. FINAL DEAL BUILD ── */}
           <SectionCard title="Final Vehicle Build" accent="rgba(242,234,0,0.3)" icon={
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F2EA00" strokeWidth="2">
               <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 1 1 4.93 19.07"/>
@@ -640,7 +805,7 @@ export default function ClientDetailPage() {
             <DealBuilder client={client} onSave={refresh} />
           </SectionCard>
 
-          {/* ── 4. DOCUMENTS ── */}
+          {/* ── 6. DOCUMENTS ── */}
           <SectionCard title={`Client Documents (${docs.length})`} icon={
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -650,7 +815,7 @@ export default function ClientDetailPage() {
             <DocPanel docs={docs} clientId={id} />
           </SectionCard>
 
-          {/* ── 5. TRADE-IN ── */}
+          {/* ── 7. TRADE-IN ── */}
           {client.hasTradeIn && (
             <SectionCard title="Trade-In Vehicle" icon={
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -674,7 +839,7 @@ export default function ClientDetailPage() {
             </SectionCard>
           )}
 
-          {/* ── 6. NOTES ── */}
+          {/* ── 8. NOTES ── */}
           <SectionCard title="Internal Notes" icon={
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
