@@ -399,6 +399,44 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     })();
   });
 
+  // ─── Intelligence (Supabase Edge Function proxy) ───────────────────────
+
+  app.get("/api/clients/:id/intelligence", async (req, res) => {
+    const id = parseInt(req.params.id);
+    // Email can come from query param or we look it up from storage
+    let email = req.query.email as string | undefined;
+    if (!email) {
+      const client = storage.getClient(id);
+      if (!client) return res.status(404).json({ message: "Client not found" });
+      email = client.email ?? undefined;
+    }
+    if (!email) {
+      return res.status(400).json({ message: "Client has no email — cannot query hub" });
+    }
+    try {
+      const supabaseUrl = `https://onkpufezwbrkuqbqfele.supabase.co/functions/v1/client-profile-query?email=${encodeURIComponent(email)}`;
+      const supabaseRes = await fetch(supabaseUrl, {
+        headers: {
+          Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ua3B1ZmV6d2Jya3VxYnFmZWxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1MDIyMzcsImV4cCI6MjA5MTA3ODIzN30.kji9VxGi-tbKJlSGrofC5A2_m9_D944VjjKUGTQM_YQ",
+          "Content-Type": "application/json",
+        },
+      });
+      if (supabaseRes.status === 404) {
+        return res.json({ not_found: true });
+      }
+      if (!supabaseRes.ok) {
+        const errText = await supabaseRes.text();
+        console.error("[intelligence] Supabase error:", supabaseRes.status, errText);
+        return res.status(502).json({ message: "Hub query failed", status: supabaseRes.status });
+      }
+      const data = await supabaseRes.json();
+      return res.json(data);
+    } catch (err) {
+      console.error("[intelligence] Fetch error:", err);
+      return res.status(500).json({ message: "Intelligence fetch failed", error: String(err) });
+    }
+  });
+
   // ─── Documents ──────────────────────────────────────────────────────────
 
   app.get("/api/clients/:id/documents", (req, res) => {

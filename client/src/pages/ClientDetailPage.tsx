@@ -374,6 +374,472 @@ function DocPanel({ docs, clientId }: { docs: Document[]; clientId: string }) {
   );
 }
 
+// ─── Intelligence helpers ─────────────────────────────────────────────────────
+
+const HUB_STAGE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  lead:         { label: "Lead",         color: "rgba(255,255,255,0.6)",  bg: "rgba(255,255,255,0.08)" },
+  discovery:    { label: "Discovery",    color: "#1FC3EF",               bg: "rgba(31,195,239,0.13)" },
+  shortlist:    { label: "Shortlist",    color: "#F2EA00",               bg: "rgba(242,234,0,0.12)" },
+  test_drive:   { label: "Test Drive",   color: "#ADF029",               bg: "rgba(173,240,41,0.12)" },
+  negotiation:  { label: "Negotiation",  color: "#f97316",               bg: "rgba(249,115,22,0.13)" },
+  closed_won:   { label: "Closed Won",   color: "#ADF029",               bg: "rgba(173,240,41,0.18)" },
+  closed_lost:  { label: "Closed Lost",  color: "#ef4444",               bg: "rgba(239,68,68,0.13)" },
+};
+
+const PRIORITY_STYLES: Record<string, { bg: string; color: string }> = {
+  high:   { bg: "rgba(239,68,68,0.15)",      color: "#ef4444" },
+  medium: { bg: "rgba(242,234,0,0.1)",       color: "#F2EA00" },
+  low:    { bg: "rgba(255,255,255,0.07)",    color: "rgba(255,255,255,0.55)" },
+};
+
+function StageBadge({ stage }: { stage?: string }) {
+  const s = (stage || "").toLowerCase();
+  const cfg = HUB_STAGE_LABELS[s] || { label: stage || "Unknown", color: "rgba(255,255,255,0.5)", bg: "rgba(255,255,255,0.07)" };
+  return (
+    <span className="px-3 py-1 rounded-full text-xs font-black"
+      style={{ background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.color}44`, fontFamily: "Industry, sans-serif", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+      {cfg.label}
+    </span>
+  );
+}
+
+function PriorityBadge({ priority }: { priority?: string }) {
+  const p = (priority || "low").toLowerCase();
+  const cfg = PRIORITY_STYLES[p] || PRIORITY_STYLES.low;
+  return (
+    <span className="px-2 py-0.5 rounded text-xs font-bold"
+      style={{ background: cfg.bg, color: cfg.color, fontFamily: "Industry, sans-serif", textTransform: "capitalize" }}>
+      {p}
+    </span>
+  );
+}
+
+function IntelChip({ label, color }: { label: string; color?: string }) {
+  const c = color || "#1FC3EF";
+  return (
+    <span className="px-2.5 py-1 rounded-lg text-xs font-bold"
+      style={{ background: `${c}18`, color: c, border: `1px solid ${c}33` }}>
+      {label}
+    </span>
+  );
+}
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="flex items-center justify-center py-12">
+      <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", textAlign: "center", lineHeight: 1.6 }}>{message}</p>
+    </div>
+  );
+}
+
+function IntelCard({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl px-4 py-3"
+      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+      {children}
+    </div>
+  );
+}
+
+function IntelLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.78)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6, fontFamily: "Industry, sans-serif" }}>
+      {children}
+    </p>
+  );
+}
+
+// ─── Intelligence sub-tab: Overview ──────────────────────────────────────────
+function IntelOverviewTab({ intel }: { intel: any }) {
+  const actionItems: any[] = intel?.action_items || [];
+  const openActions = actionItems.filter((a: any) => !a.completed && !a.done);
+  const openQuestions: any[] = (intel?.open_questions || []).filter((q: any) => !q.resolved && !q.answered);
+  const stage: string | undefined = intel?.deal_stage || intel?.stage;
+
+  const hasData = stage || openActions.length > 0 || openQuestions.length > 0;
+
+  if (!hasData) {
+    return <EmptyState message="Not yet analyzed. No deal stage, action items, or open questions recorded." />;
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Deal stage */}
+      {stage && (
+        <IntelCard>
+          <div className="flex items-center gap-3">
+            <IntelLabel>Deal Stage</IntelLabel>
+            <StageBadge stage={stage} />
+          </div>
+        </IntelCard>
+      )}
+
+      {/* Open action items */}
+      {openActions.length > 0 && (
+        <div>
+          <IntelLabel>Open Action Items</IntelLabel>
+          <div className="flex flex-col gap-2">
+            {openActions.map((item: any, i: number) => (
+              <IntelCard key={i}>
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p style={{ fontSize: 13, color: "rgba(255,255,255,0.88)", fontWeight: 600, marginBottom: 4 }}>
+                      {item.task || item.title || item.description || "Untitled action"}
+                    </p>
+                    {item.due_date && (
+                      <p style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", fontFamily: "Industry, sans-serif" }}>
+                        Due {item.due_date}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {item.owner && (
+                      <span className="px-2 py-0.5 rounded text-xs font-bold"
+                        style={{ background: "rgba(31,195,239,0.12)", color: "#1FC3EF", border: "1px solid rgba(31,195,239,0.2)", fontFamily: "Industry, sans-serif" }}>
+                        {item.owner}
+                      </span>
+                    )}
+                    <PriorityBadge priority={item.priority} />
+                  </div>
+                </div>
+              </IntelCard>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Open questions */}
+      {openQuestions.length > 0 && (
+        <div>
+          <IntelLabel>Open Questions</IntelLabel>
+          <div className="flex flex-col gap-2">
+            {openQuestions.map((q: any, i: number) => (
+              <IntelCard key={i}>
+                <p style={{ fontSize: 13, color: "rgba(255,255,255,0.82)", lineHeight: 1.55 }}>
+                  {q.question || q.text || String(q)}
+                </p>
+              </IntelCard>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Intelligence sub-tab: Meetings ──────────────────────────────────────────
+function IntelMeetingsTab({ intel }: { intel: any }) {
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+  const meetings: any[] = (intel?.meetings || intel?.meeting_summaries || []).slice().reverse();
+
+  if (meetings.length === 0) {
+    return <EmptyState message="No meetings recorded yet." />;
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {meetings.map((m: any, i: number) => {
+        const isOpen = expandedIdx === i;
+        const actionPlan = m.action_plan || m.summary_data || {};
+        const nextSteps: any[] = actionPlan.next_steps || m.next_steps || [];
+        const clientNeeds: string[] = actionPlan.client_needs || m.client_needs || [];
+        const crmNotes: string = actionPlan.crm_notes || m.crm_notes || "";
+        const summary: string = actionPlan.summary || m.summary || m.notes || "";
+
+        return (
+          <div key={i} className="rounded-xl overflow-hidden"
+            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            {/* Header row — always visible */}
+            <button
+              onClick={() => setExpandedIdx(isOpen ? null : i)}
+              className="w-full flex items-center justify-between px-4 py-3 text-left transition-colors hover:bg-white/5"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ background: "rgba(31,195,239,0.12)" }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1FC3EF" strokeWidth="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                    <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+                    <line x1="3" y1="10" x2="21" y2="10"/>
+                  </svg>
+                </div>
+                <div className="min-w-0">
+                  <p style={{ fontSize: 13, fontWeight: 700, color: "white", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {m.topic || m.title || m.meeting_type || "Meeting"}
+                  </p>
+                  <p style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", fontFamily: "Industry, sans-serif" }}>
+                    {m.date || m.created_at ? new Date(m.date || m.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Date unknown"}
+                    {m.duration ? ` · ${m.duration}` : ""}
+                  </p>
+                </div>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2"
+                style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s", flexShrink: 0 }}>
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </button>
+
+            {/* Expanded action plan */}
+            {isOpen && (
+              <div className="px-4 pb-4 flex flex-col gap-4 border-t" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+                {summary && (
+                  <div className="pt-3">
+                    <IntelLabel>Summary</IntelLabel>
+                    <p style={{ fontSize: 13, color: "rgba(255,255,255,0.78)", lineHeight: 1.6 }}>{summary}</p>
+                  </div>
+                )}
+
+                {clientNeeds.length > 0 && (
+                  <div>
+                    <IntelLabel>Client Needs</IntelLabel>
+                    <div className="flex flex-wrap gap-1.5">
+                      {clientNeeds.map((need: string, ni: number) => (
+                        <IntelChip key={ni} label={need} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {crmNotes && (
+                  <div>
+                    <IntelLabel>CRM Notes</IntelLabel>
+                    <div className="rounded-lg px-3 py-2.5"
+                      style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", fontFamily: "monospace" }}>
+                      <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{crmNotes}</p>
+                    </div>
+                  </div>
+                )}
+
+                {nextSteps.length > 0 && (
+                  <div>
+                    <IntelLabel>Next Steps</IntelLabel>
+                    <div className="flex flex-col gap-2">
+                      {nextSteps.map((step: any, si: number) => {
+                        const label = typeof step === "string" ? step : (step.task || step.step || step.description || String(step));
+                        const done = typeof step === "object" && (step.completed || step.done);
+                        return (
+                          <div key={si} className="flex items-start gap-2.5">
+                            <div className="flex-shrink-0 w-4 h-4 mt-0.5 rounded border flex items-center justify-center"
+                              style={{ borderColor: done ? "#ADF029" : "rgba(255,255,255,0.2)", background: done ? "rgba(173,240,41,0.15)" : "transparent" }}>
+                              {done && (
+                                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#ADF029" strokeWidth="3">
+                                  <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                              )}
+                            </div>
+                            <p style={{ fontSize: 13, color: done ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.78)", lineHeight: 1.5, textDecoration: done ? "line-through" : "none" }}>
+                              {label}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Intelligence sub-tab: Questionnaire ─────────────────────────────────────
+function IntelQuestionnaireTab({ intel }: { intel: any }) {
+  const qr = intel?.questionnaire_response || intel?.questionnaire_responses?.[0] || null;
+
+  if (!qr) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="rounded-xl px-4 py-3"
+          style={{ background: "rgba(31,195,239,0.06)", border: "1px solid rgba(31,195,239,0.15)" }}>
+          <p style={{ fontSize: 12, color: "rgba(31,195,239,0.8)", lineHeight: 1.6 }}>
+            Portal intake data is shown in the Overview tab. This shows the structured hub questionnaire if completed separately.
+          </p>
+        </div>
+        <EmptyState message="No questionnaire submitted yet." />
+      </div>
+    );
+  }
+
+  const budgetMin = qr.budget_min || qr.budget?.min;
+  const budgetMax = qr.budget_max || qr.budget?.max;
+  const budgetRange = budgetMin || budgetMax
+    ? [budgetMin ? `$${Number(budgetMin).toLocaleString()}` : null, budgetMax ? `$${Number(budgetMax).toLocaleString()}` : null].filter(Boolean).join(" – ")
+    : (qr.budget_range || qr.budget || null);
+
+  const bodyStyles: string[] = Array.isArray(qr.body_styles) ? qr.body_styles : (qr.body_styles ? [qr.body_styles] : []);
+  const mustHave: string[] = Array.isArray(qr.must_have_features) ? qr.must_have_features : (qr.must_have_features ? [qr.must_have_features] : []);
+  const niceToHave: string[] = Array.isArray(qr.nice_to_have_features) ? qr.nice_to_have_features : (qr.nice_to_have_features ? [qr.nice_to_have_features] : []);
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Note about portal intake */}
+      <div className="rounded-xl px-4 py-3"
+        style={{ background: "rgba(31,195,239,0.06)", border: "1px solid rgba(31,195,239,0.15)" }}>
+        <p style={{ fontSize: 12, color: "rgba(31,195,239,0.8)", lineHeight: 1.6 }}>
+          Portal intake data is shown in the Overview tab. This shows the structured hub questionnaire if completed separately.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        {budgetRange && (
+          <IntelCard>
+            <IntelLabel>Budget Range</IntelLabel>
+            <p style={{ fontSize: 15, fontWeight: 700, color: "#ADF029" }}>{budgetRange}</p>
+          </IntelCard>
+        )}
+
+        {bodyStyles.length > 0 && (
+          <IntelCard>
+            <IntelLabel>Preferred Body Styles</IntelLabel>
+            <div className="flex flex-wrap gap-1.5">
+              {bodyStyles.map((s, i) => <IntelChip key={i} label={s} />)}
+            </div>
+          </IntelCard>
+        )}
+
+        {mustHave.length > 0 && (
+          <IntelCard>
+            <IntelLabel>Must-Have Features</IntelLabel>
+            <div className="flex flex-wrap gap-1.5">
+              {mustHave.map((f, i) => <IntelChip key={i} label={f} color="#ADF029" />)}
+            </div>
+          </IntelCard>
+        )}
+
+        {niceToHave.length > 0 && (
+          <IntelCard>
+            <IntelLabel>Nice-to-Have Features</IntelLabel>
+            <div className="flex flex-wrap gap-1.5">
+              {niceToHave.map((f, i) => <IntelChip key={i} label={f} color="rgba(255,255,255,0.6)" />)}
+            </div>
+          </IntelCard>
+        )}
+
+        {qr.use_case && (
+          <IntelCard>
+            <IntelLabel>Use Case</IntelLabel>
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.82)" }}>{qr.use_case}</p>
+          </IntelCard>
+        )}
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {qr.timeline != null && (
+            <IntelCard>
+              <IntelLabel>Timeline</IntelLabel>
+              <p style={{ fontSize: 13, color: "rgba(255,255,255,0.82)", fontWeight: 600 }}>{qr.timeline}</p>
+            </IntelCard>
+          )}
+          {qr.has_trade_in != null && (
+            <IntelCard>
+              <IntelLabel>Trade-In</IntelLabel>
+              <p style={{ fontSize: 13, fontWeight: 700, color: qr.has_trade_in ? "#ADF029" : "rgba(255,255,255,0.82)" }}>
+                {qr.has_trade_in ? "Yes" : "No"}
+              </p>
+            </IntelCard>
+          )}
+          {qr.financing_needed != null && (
+            <IntelCard>
+              <IntelLabel>Financing</IntelLabel>
+              <p style={{ fontSize: 13, fontWeight: 700, color: qr.financing_needed ? "#1FC3EF" : "rgba(255,255,255,0.82)" }}>
+                {qr.financing_needed ? "Yes" : "No"}
+              </p>
+            </IntelCard>
+          )}
+        </div>
+
+        {qr.notes && (
+          <IntelCard>
+            <IntelLabel>Notes</IntelLabel>
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.78)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{qr.notes}</p>
+          </IntelCard>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Intelligence Tab container ───────────────────────────────────────────────
+function IntelligenceTab({ clientId }: { clientId: string }) {
+  const [subTab, setSubTab] = useState<"overview" | "meetings" | "questionnaire">("overview");
+
+  const { data: intel, isLoading, isError } = useQuery<any>({
+    queryKey: ["/api/clients", clientId, "intelligence"],
+    queryFn: async () => {
+      const res = await fetch(`/api/clients/${clientId}/intelligence`);
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    retry: false,
+    staleTime: 60_000,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <div className="w-6 h-6 border-2 rounded-full animate-spin"
+          style={{ borderColor: "#1FC3EF", borderTopColor: "transparent" }} />
+      </div>
+    );
+  }
+
+  if (isError || !intel) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", textAlign: "center", lineHeight: 1.7, maxWidth: 380 }}>
+          No intelligence data found. This client may not have a hub record yet — their email needs to match.
+        </p>
+      </div>
+    );
+  }
+
+  if (intel.not_found) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", textAlign: "center", lineHeight: 1.7, maxWidth: 380 }}>
+          No intelligence data found. This client may not have a hub record yet — their email needs to match.
+        </p>
+      </div>
+    );
+  }
+
+  const SUB_TABS = [
+    { key: "overview" as const,       label: "Overview" },
+    { key: "meetings" as const,       label: "Meetings" },
+    { key: "questionnaire" as const,  label: "Questionnaire" },
+  ];
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Sub-tab bar */}
+      <div className="flex gap-1 rounded-xl p-1" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+        {SUB_TABS.map(t => (
+          <button key={t.key}
+            onClick={() => setSubTab(t.key)}
+            className="flex-1 py-2 rounded-lg text-xs font-black transition-all"
+            style={{
+              fontFamily: "Industry, sans-serif",
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              background: subTab === t.key ? "rgba(31,195,239,0.15)" : "transparent",
+              color: subTab === t.key ? "#1FC3EF" : "rgba(255,255,255,0.45)",
+              border: subTab === t.key ? "1px solid rgba(31,195,239,0.25)" : "1px solid transparent",
+            }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Sub-tab content */}
+      {subTab === "overview"      && <IntelOverviewTab intel={intel} />}
+      {subTab === "meetings"      && <IntelMeetingsTab intel={intel} />}
+      {subTab === "questionnaire" && <IntelQuestionnaireTab intel={intel} />}
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -382,6 +848,7 @@ export default function ClientDetailPage() {
   const qc = useQueryClient();
   const [notes, setNotes] = useState("");
   const [editingNotes, setEditingNotes] = useState(false);
+  const [activeTab, setActiveTab] = useState<"overview" | "questionnaire" | "documents" | "deal" | "intelligence">("overview");
 
   const { data: client, isLoading } = useQuery<Client>({
     queryKey: ["/api/clients", id],
@@ -532,10 +999,48 @@ export default function ClientDetailPage() {
           </div>
         </header>
 
+        {/* ── Main tab bar ── */}
+        <div className="px-4 md:px-8 pt-4 flex gap-1 overflow-x-auto" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+          {([
+            { key: "overview",      label: "Overview" },
+            { key: "questionnaire", label: "Questionnaire" },
+            { key: "documents",     label: "Documents" },
+            { key: "deal",          label: "Deal Build" },
+            { key: "intelligence",  label: "Intelligence" },
+          ] as const).map(tab => (
+            <button key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className="px-4 py-2.5 text-xs font-black whitespace-nowrap transition-all flex-shrink-0"
+              style={{
+                fontFamily: "Industry, sans-serif",
+                letterSpacing: "0.07em",
+                textTransform: "uppercase",
+                color: activeTab === tab.key ? "#1FC3EF" : "rgba(255,255,255,0.4)",
+                borderBottom: activeTab === tab.key ? "2px solid #1FC3EF" : "2px solid transparent",
+                background: "transparent",
+                marginBottom: -1,
+                ...(tab.key === "intelligence" ? { color: activeTab === "intelligence" ? "#1FC3EF" : "rgba(173,240,41,0.7)" } : {}),
+              }}>
+              {tab.key === "intelligence" && (
+                <span style={{ marginRight: 4, opacity: 0.85 }}>&#9889;</span>
+              )}
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         {/* ── Page body ── */}
         <div className="px-4 md:px-8 py-4 md:py-6 flex flex-col gap-4 md:gap-5 max-w-5xl pb-24 lg:pb-6">
 
-          {/* ── 1. ASSIGNMENT ── */}
+          {/* ── INTELLIGENCE TAB ── */}
+          {activeTab === "intelligence" && (
+            <IntelligenceTab clientId={id} />
+          )}
+
+          {/* ── OVERVIEW TAB ── */}
+          {activeTab === "overview" && (<>
+
+          {/* 1. ASSIGNMENT */}
           <SectionCard title="Deal Assignment" accent="rgba(31,195,239,0.25)" icon={
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
@@ -545,8 +1050,7 @@ export default function ClientDetailPage() {
             <AssigneePicker clientId={client.id} current={client.assignedTo} onChange={refresh} />
           </SectionCard>
 
-          {/* ── 2. CLIENT SNAPSHOT ── */}
-          {/* On mobile: stack vertically. On desktop: 2/3 + 1/3 grid */}
+          {/* 2. CLIENT SNAPSHOT */}
           <div className="flex flex-col lg:grid lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2">
               <SectionCard title="Client Overview" icon={
@@ -554,7 +1058,6 @@ export default function ClientDetailPage() {
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
                 </svg>
               }>
-                {/* 2-col on sm+, 1-col on mobile */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
                   <div>
                     <Row label="Name"      value={`${client.firstName} ${client.lastName}`} />
@@ -692,7 +1195,7 @@ export default function ClientDetailPage() {
             </div>
           </div>
 
-          {/* ── 3. LIFESTYLE & PERKS ── */}
+          {/* 3. LIFESTYLE & PERKS */}
           {(client.costcoMembership || client.isVeteran || householdVehicles.filter(v => v.year || v.make || v.model).length > 0) && (
             <SectionCard title="Lifestyle & Perks" icon={
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -724,7 +1227,7 @@ export default function ClientDetailPage() {
             </SectionCard>
           )}
 
-          {/* ── 4. PRIORITY RANKINGS ── */}
+          {/* 4. PRIORITY RANKINGS */}
           {Object.keys(priorityRankings).length > 0 && (
             <SectionCard title="Priority Rankings" accent="rgba(173,240,41,0.2)" icon={
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ADF029" strokeWidth="2">
@@ -732,7 +1235,6 @@ export default function ClientDetailPage() {
               </svg>
             }>
               <div className="flex flex-col gap-2">
-                {/* Group by rank for easy scanning */}
                 {([5,4,3,2,1] as const).map(rank => {
                   const cats = PRIORITY_CATEGORIES.filter(c => priorityRankings[c] === rank);
                   if (cats.length === 0) return null;
@@ -754,7 +1256,6 @@ export default function ClientDetailPage() {
                     </div>
                   );
                 })}
-                {/* N/A row */}
                 {(() => {
                   const naCats = PRIORITY_CATEGORIES.filter(c => priorityRankings[c] === "na");
                   if (naCats.length === 0) return null;
@@ -793,53 +1294,7 @@ export default function ClientDetailPage() {
             </SectionCard>
           )}
 
-          {/* ── 5. FINAL DEAL BUILD ── */}
-          <SectionCard title="Final Vehicle Build" accent="rgba(242,234,0,0.3)" icon={
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F2EA00" strokeWidth="2">
-              <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 1 1 4.93 19.07"/>
-            </svg>
-          }>
-            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginBottom: 16 }}>
-              Complete this section to send the deal to Mike Minerva for sourcing. Pre-populated with client preferences — adjust as needed.
-            </p>
-            <DealBuilder client={client} onSave={refresh} />
-          </SectionCard>
-
-          {/* ── 6. DOCUMENTS ── */}
-          <SectionCard title={`Client Documents (${docs.length})`} icon={
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-            </svg>
-          }>
-            <DocPanel docs={docs} clientId={id} />
-          </SectionCard>
-
-          {/* ── 7. TRADE-IN ── */}
-          {client.hasTradeIn && (
-            <SectionCard title="Trade-In Vehicle" icon={
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-                <polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-              </svg>
-            }>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-                <div>
-                  <Row label="Year"      value={client.tradeYear} />
-                  <Row label="Make"      value={client.tradeMake} />
-                  <Row label="Model"     value={client.tradeModel} />
-                  <Row label="Trim"      value={client.tradeTrim} />
-                </div>
-                <div>
-                  <Row label="Mileage"   value={client.tradeMileage} />
-                  <Row label="Condition" value={client.tradeCondition} />
-                  <Row label="Owed"      value={client.tradeOwed} />
-                </div>
-              </div>
-            </SectionCard>
-          )}
-
-          {/* ── 8. NOTES ── */}
+          {/* 5. NOTES */}
           <SectionCard title="Internal Notes" icon={
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -880,6 +1335,96 @@ export default function ClientDetailPage() {
               </div>
             )}
           </SectionCard>
+
+          </>)}
+
+          {/* ── QUESTIONNAIRE TAB ── */}
+          {activeTab === "questionnaire" && (
+            <SectionCard title="Client Questionnaire" icon={
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+              </svg>
+            }>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+                <div>
+                  <Row label="Name"      value={`${client.firstName} ${client.lastName}`} />
+                  <Row label="Purchase"  value={client.purchaseType} />
+                  <Row label="Budget"    value={client.budget} />
+                  <Row label="Down Pmt"  value={client.downPayment} />
+                  <Row label="Monthly"   value={client.monthlyPayment} />
+                  <Row label="Credit"    value={client.creditScore} />
+                  <Row label="Timeframe" value={client.timeframe} />
+                </div>
+                <div>
+                  {preferredMakes.length > 0 && (
+                    <div className="mb-3">
+                      <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.78)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Preferred Makes</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {preferredMakes.map((m: string) => <Pill key={m} label={m} />)}
+                      </div>
+                    </div>
+                  )}
+                  {bodyStyles.length > 0 && (
+                    <div className="mb-3">
+                      <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.78)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Body Styles</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {bodyStyles.map((s: string) => <Pill key={s} label={s} />)}
+                      </div>
+                    </div>
+                  )}
+                  <Row label="Must-Have"     value={client.mustHaveFeatures} />
+                  <Row label="Nice-to-Have"  value={client.niceToHaveFeatures} />
+                  <Row label="Annual Miles"  value={client.annualMileage} />
+                  <Row label="Powertrain"    value={client.powertrain} />
+                  <Row label="Trade-In"      value={client.hasTradeIn ? "Yes" : "No"} />
+                </div>
+              </div>
+              {client.hasTradeIn && (
+                <div className="mt-4 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.78)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>Trade-In Vehicle</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+                    <div>
+                      <Row label="Year"      value={client.tradeYear} />
+                      <Row label="Make"      value={client.tradeMake} />
+                      <Row label="Model"     value={client.tradeModel} />
+                      <Row label="Trim"      value={client.tradeTrim} />
+                    </div>
+                    <div>
+                      <Row label="Mileage"   value={client.tradeMileage} />
+                      <Row label="Condition" value={client.tradeCondition} />
+                      <Row label="Owed"      value={client.tradeOwed} />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </SectionCard>
+          )}
+
+          {/* ── DOCUMENTS TAB ── */}
+          {activeTab === "documents" && (
+            <SectionCard title={`Client Documents (${docs.length})`} icon={
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+              </svg>
+            }>
+              <DocPanel docs={docs} clientId={id} />
+            </SectionCard>
+          )}
+
+          {/* ── DEAL BUILD TAB ── */}
+          {activeTab === "deal" && (
+            <SectionCard title="Final Vehicle Build" accent="rgba(242,234,0,0.3)" icon={
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F2EA00" strokeWidth="2">
+                <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 1 1 4.93 19.07"/>
+              </svg>
+            }>
+              <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginBottom: 16 }}>
+                Complete this section to send the deal to Mike Minerva for sourcing. Pre-populated with client preferences — adjust as needed.
+              </p>
+              <DealBuilder client={client} onSave={refresh} />
+            </SectionCard>
+          )}
 
         </div>
       </main>
