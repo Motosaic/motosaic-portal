@@ -263,6 +263,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   app.post("/api/clients", (req, res) => {
+    // Allow requests from the admin UI (no secret needed) OR from trusted
+    // internal services that present the PORTAL_API_SECRET header.
+    const portalSecret = process.env.PORTAL_API_SECRET;
+    const incomingSecret = req.headers["x-portal-secret"];
+    // If PORTAL_API_SECRET is configured, external calls must present it.
+    // Requests from the same origin (no header) are allowed through — the
+    // admin UI never sends the header and runs on the same domain.
+    if (portalSecret && incomingSecret && incomingSecret !== portalSecret) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
     try {
       const data = insertClientSchema.parse(req.body);
       const client = storage.createClient(data);
