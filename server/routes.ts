@@ -420,11 +420,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!client) return res.status(404).json({ message: "Client not found" });
       email = client.email ?? undefined;
     }
-    if (!email) {
-      return res.status(400).json({ message: "Client has no email — cannot query hub" });
-    }
     try {
-      const supabaseUrl = `https://onkpufezwbrkuqbqfele.supabase.co/functions/v1/client-profile-query?email=${encodeURIComponent(email)}`;
+      // Build query: prefer email lookup, fall back to name search
+      let queryParam: string;
+      if (email) {
+        queryParam = `email=${encodeURIComponent(email)}`;
+      } else {
+        const client = storage.getClient(id);
+        const fullName = client ? `${client.firstName} ${client.lastName}`.trim() : "";
+        queryParam = fullName ? `name=${encodeURIComponent(fullName)}` : "";
+      }
+      if (!queryParam) {
+        return res.json({ not_found: true });
+      }
+      const supabaseUrl = `https://onkpufezwbrkuqbqfele.supabase.co/functions/v1/client-profile-query?${queryParam}`;
       const supabaseRes = await fetch(supabaseUrl, {
         headers: {
           Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ua3B1ZmV6d2Jya3VxYnFmZWxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1MDIyMzcsImV4cCI6MjA5MTA3ODIzN30.kji9VxGi-tbKJlSGrofC5A2_m9_D944VjjKUGTQM_YQ",
