@@ -166,6 +166,207 @@ function MinervaSheetCard() {
   );
 }
 
+const STAGES = [
+  { key: "discovery_booked",  label: "Discovery Booked",      shortLabel: "Discovery",  color: "#1FC3EF" },
+  { key: "pending_proposal",  label: "Pending Proposal Sig",  shortLabel: "Proposal",   color: "#F59E0B" },
+  { key: "scoping_booked",    label: "Scoping Call Booked",   shortLabel: "Scoping",    color: "#8B5CF6" },
+  { key: "test_drives",       label: "Test Drives Scheduled", shortLabel: "Test Drive", color: "#ADF029" },
+  { key: "pending_delivery",  label: "Pending Delivery",      shortLabel: "Delivery",   color: "#F97316" },
+  { key: "closed",            label: "Closed",                shortLabel: "Closed",     color: "#10B981" },
+];
+
+function getStage(client: Client, stageMap: Record<number, string>): string {
+  if (stageMap[client.id]) return stageMap[client.id];
+  if (client.status === "closed") return "closed";
+  if (client.status === "ready") return "test_drives";
+  if (client.status === "in_progress") return "scoping_booked";
+  return "discovery_booked";
+}
+
+function KanbanCard({
+  client,
+  onNavigate,
+  onDragStart,
+  onDragEnd,
+}: {
+  client: Client;
+  onNavigate: (id: number) => void;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+}) {
+  const vehicle =
+    [client.preferredMakes, client.preferredModels].filter(Boolean).join(" ") || "—";
+  return (
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onClick={() => onNavigate(client.id)}
+      style={{
+        background: "rgba(255,255,255,0.05)",
+        border: "1px solid rgba(255,255,255,0.09)",
+        borderRadius: 10,
+        padding: "10px 12px",
+        cursor: "grab",
+        transition: "all 0.15s",
+        marginBottom: 8,
+      }}
+      className="hover:border-[rgba(31,195,239,0.3)] hover:bg-[rgba(255,255,255,0.08)]"
+    >
+      <p style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.9)", marginBottom: 3 }}>
+        {client.firstName} {client.lastName}
+      </p>
+      <p style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", marginBottom: 2 }}>{vehicle}</p>
+      <p style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{client.state || "—"}</p>
+    </div>
+  );
+}
+
+function KanbanBoard({
+  clients,
+  onNavigate,
+}: {
+  clients: Client[];
+  onNavigate: (id: number) => void;
+}) {
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("motosaic_pipeline_collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
+  const [stageMap, setStageMap] = useState<Record<number, string>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("motosaic_pipeline") || "{}");
+    } catch {
+      return {};
+    }
+  });
+  const [draggedId, setDraggedId] = useState<number | null>(null);
+  const [dragOverStage, setDragOverStage] = useState<string | null>(null);
+
+  function toggleCollapsed() {
+    setCollapsed(c => {
+      const next = !c;
+      try { localStorage.setItem("motosaic_pipeline_collapsed", String(next)); } catch {}
+      return next;
+    });
+  }
+
+  function clientsInStage(stageKey: string) {
+    return clients.filter(c => getStage(c, stageMap) === stageKey);
+  }
+
+  return (
+    <div style={{ marginBottom: 24, borderRadius: 16, border: "1px solid rgba(255,255,255,0.08)", overflow: "hidden" }}>
+      {/* Header bar — always visible */}
+      <div
+        onClick={toggleCollapsed}
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "12px 16px", cursor: "pointer",
+          background: "rgba(255,255,255,0.03)",
+          borderBottom: collapsed ? "none" : "1px solid rgba(255,255,255,0.08)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flex: 1 }}>
+          {/* Kanban icon */}
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" style={{ flexShrink: 0 }}>
+            <rect x="3" y="3" width="5" height="12" rx="1"/>
+            <rect x="10" y="3" width="5" height="8" rx="1"/>
+            <rect x="17" y="3" width="4" height="15" rx="1"/>
+          </svg>
+          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", color: "rgba(255,255,255,0.7)", fontFamily: "Industry, sans-serif", textTransform: "uppercase", flexShrink: 0 }}>
+            Pipeline
+          </span>
+          {/* Stage pills when collapsed */}
+          {collapsed && (
+            <div style={{ display: "flex", gap: 6, marginLeft: 8, flexWrap: "wrap" }}>
+              {STAGES.map(stage => {
+                const count = clientsInStage(stage.key).length;
+                if (count === 0) return null;
+                return (
+                  <span key={stage.key} style={{
+                    fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 20,
+                    background: `${stage.color}18`, color: stage.color,
+                    border: `1px solid ${stage.color}40`,
+                  }}>
+                    {stage.shortLabel} {count}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        {/* Expand/collapse chevron */}
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2"
+          style={{ transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)", transition: "transform 0.2s", flexShrink: 0 }}>
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </div>
+
+      {/* Board — only when expanded */}
+      {!collapsed && (
+        <div style={{ display: "flex", gap: 0, overflowX: "auto", padding: "14px 12px" }}>
+          {STAGES.map((stage, i) => (
+            <div
+              key={stage.key}
+              style={{
+                flex: "1 1 0", minWidth: 150, maxWidth: 220,
+                borderRight: i < STAGES.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none",
+                padding: "0 10px",
+                background: dragOverStage === stage.key ? "rgba(31,195,239,0.03)" : "transparent",
+                borderRadius: dragOverStage === stage.key ? 8 : 0,
+                transition: "background 0.15s",
+              }}
+              onDragOver={e => { e.preventDefault(); setDragOverStage(stage.key); }}
+              onDragLeave={() => setDragOverStage(null)}
+              onDrop={e => {
+                e.preventDefault();
+                if (draggedId !== null) {
+                  const newMap = { ...stageMap, [draggedId]: stage.key };
+                  setStageMap(newMap);
+                  try { localStorage.setItem("motosaic_pipeline", JSON.stringify(newMap)); } catch {}
+                }
+                setDragOverStage(null);
+              }}
+            >
+              {/* Column header */}
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10, paddingBottom: 8, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                <div style={{ width: 7, height: 7, borderRadius: "50%", background: stage.color, flexShrink: 0 }} />
+                <span style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.55)", letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "Industry, sans-serif", flex: 1, lineHeight: 1.3 }}>
+                  {stage.label}
+                </span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: stage.color, background: `${stage.color}18`, borderRadius: 10, padding: "1px 6px", border: `1px solid ${stage.color}30`, flexShrink: 0 }}>
+                  {clientsInStage(stage.key).length}
+                </span>
+              </div>
+              {/* Cards */}
+              <div style={{ maxHeight: 380, overflowY: "auto" }}>
+                {clientsInStage(stage.key).map(client => (
+                  <KanbanCard
+                    key={client.id}
+                    client={client}
+                    onNavigate={onNavigate}
+                    onDragStart={() => setDraggedId(client.id)}
+                    onDragEnd={() => { setDraggedId(null); setDragOverStage(null); }}
+                  />
+                ))}
+                {clientsInStage(stage.key).length === 0 && (
+                  <div style={{ padding: "16px 8px", textAlign: "center" }}>
+                    <p style={{ fontSize: 11, color: "rgba(255,255,255,0.2)" }}>—</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const AGENTS: Record<string, { label: string; color: string }> = {
   mike_calcara:  { label: "Calcara",  color: "#1FC3EF" },
   mike_minerva:  { label: "Minerva",  color: "#ADF029" },
@@ -337,6 +538,9 @@ export default function AdminDashboard() {
         </header>
 
         <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 md:py-6 pb-24 lg:pb-6">
+
+          {/* Pipeline Kanban */}
+          <KanbanBoard clients={clients} onNavigate={(id) => navigate(`/clients/${id}`)} />
 
           {/* Stats — 2-col on mobile, 4-col on desktop */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
