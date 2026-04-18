@@ -456,6 +456,79 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // ─── Client Chat (Claude AI) ─────────────────────────────────────────────
+
+  app.post("/api/clients/:id/chat", async (req, res) => {
+    const id = parseInt(req.params.id);
+    const { message, history } = req.body as { message: string; history?: { role: string; content: string }[] };
+    if (!message) return res.status(400).json({ message: "Missing message" });
+
+    const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+    if (!ANTHROPIC_API_KEY) return res.status(500).json({ message: "Anthropic API key not configured" });
+
+    // Fetch intelligence profile for this client
+    let intelData: any = null;
+    try {
+      const client = storage.getClient(id);
+      if (!client) return res.status(404).json({ message: "Client not found" });
+      const email = client.email;
+      const fullName = `${client.firstName} ${client.lastName}`.trim();
+      const queryParam = email
+        ? `email=${encodeURIComponent(email)}`
+        : `name=${encodeURIComponent(fullName)}`;
+      const supabaseRes = await fetch(
+        `https://onkpufezwbrkuqbqfele.supabase.co/functions/v1/client-profile-query?${queryParam}`,
+        { headers: { Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ua3B1ZmV6d2Jya3VxYnFmZWxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1MDIyMzcsImV4cCI6MjA5MTA3ODIzN30.kji9VxGi-tbKJlSGrofC5A2_m9_D944VjjKUGTQM_YQ" } }
+      );
+      if (supabaseRes.ok) intelData = await supabaseRes.json();
+      // Also attach portal client record
+      intelData = { ...intelData, portal_client: client };
+    } catch (e) {
+      // Non-fatal — answer with what we have
+    }
+
+    const systemPrompt = `You are an assistant for Mike Calcara, a car-buying concierge at Motosaic. 
+You have access to all data about this client. Answer questions concisely and helpfully.
+Be direct — Mike is a professional who needs quick, actionable answers.
+Format lists with bullet points when helpful. Keep responses under 200 words unless detail is specifically requested.
+
+CLIENT DATA:
+${JSON.stringify(intelData, null, 2)}`;
+
+    const messages = [
+      ...(history ?? []),
+      { role: "user", content: message },
+    ];
+
+    try {
+      const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-5",
+          max_tokens: 1024,
+          system: systemPrompt,
+          messages,
+        }),
+      });
+      if (!claudeRes.ok) {
+        const err = await claudeRes.text();
+        console.error("[chat] Claude error:", claudeRes.status, err);
+        return res.status(502).json({ message: "Claude API error", error: err });
+      }
+      const data = await claudeRes.json() as any;
+      const reply = data.content?.[0]?.text ?? "No response";
+      return res.json({ reply });
+    } catch (err) {
+      console.error("[chat] Error:", err);
+      return res.status(500).json({ message: "Chat failed", error: String(err) });
+    }
+  });
+
   // ─── Documents ──────────────────────────────────────────────────────────
 
   app.get("/api/clients/:id/documents", (req, res) => {

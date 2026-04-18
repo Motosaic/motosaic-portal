@@ -849,6 +849,10 @@ export default function ClientDetailPage() {
   const [notes, setNotes] = useState("");
   const [editingNotes, setEditingNotes] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "questionnaire" | "documents" | "deal" | "intelligence">("overview");
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [chatHistory, setChatHistory] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [chatLoading, setChatLoading] = useState(false);
 
   const { data: client, isLoading } = useQuery<Client>({
     queryKey: ["/api/clients", id],
@@ -867,6 +871,18 @@ export default function ClientDetailPage() {
       if (!res.ok) return [];
       return res.json();
     },
+  });
+
+  const { data: pageIntel } = useQuery<any>({
+    queryKey: ["/api/clients", id, "intelligence"],
+    queryFn: async () => {
+      const res = await fetch(`/api/clients/${id}/intelligence`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    retry: false,
+    staleTime: 60_000,
+    enabled: !!id,
   });
 
   const notesMutation = useMutation({
@@ -1049,6 +1065,93 @@ export default function ClientDetailPage() {
           }>
             <AssigneePicker clientId={client.id} current={client.assignedTo} onChange={refresh} />
           </SectionCard>
+
+          {/* AI BRIEF — only shown when intel data exists */}
+          {pageIntel && !pageIntel.not_found && (() => {
+            const latestPlan = pageIntel.meetings?.find((m: any) => m.action_plan)?.action_plan;
+            if (!latestPlan) return null;
+            return (
+              <SectionCard
+                title="AI Brief"
+                accent="rgba(31,195,239,0.25)"
+                icon={
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1FC3EF" strokeWidth="2">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                  </svg>
+                }
+              >
+                {/* Summary */}
+                {latestPlan.summary && (
+                  <p style={{ fontSize: 13, color: "rgba(255,255,255,0.82)", lineHeight: 1.6, marginBottom: 12 }}>
+                    {latestPlan.summary}
+                  </p>
+                )}
+                {/* Client needs as pills */}
+                {Array.isArray(latestPlan.client_needs) && latestPlan.client_needs.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Key Needs</p>
+                    <div className="flex flex-col gap-1.5">
+                      {latestPlan.client_needs.map((need: string, i: number) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <span style={{ color: "#1FC3EF", fontSize: 14, lineHeight: 1, marginTop: 2, flexShrink: 0 }}>&#x203A;</span>
+                          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.72)", lineHeight: 1.5 }}>{need}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Open questions */}
+                {Array.isArray(pageIntel.deal_snapshot?.open_questions) && pageIntel.deal_snapshot.open_questions.length > 0 && (
+                  <div>
+                    <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.5)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Open Questions</p>
+                    <div className="flex flex-col gap-1.5">
+                      {pageIntel.deal_snapshot.open_questions.slice(0, 3).map((q: string, i: number) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <span style={{ color: "rgba(255,200,0,0.8)", fontSize: 12, lineHeight: 1, marginTop: 2, flexShrink: 0 }}>?</span>
+                          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", lineHeight: 1.5 }}>{q}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </SectionCard>
+            );
+          })()}
+
+          {/* WHAT'S NEXT — only shown when intel data has checklist items */}
+          {pageIntel && !pageIntel.not_found && (() => {
+            const nextSteps = pageIntel.deal_snapshot?.next_steps ?? [];
+            if (nextSteps.length === 0) return null;
+            return (
+              <SectionCard
+                title="What's Next"
+                accent="rgba(173,240,41,0.2)"
+                icon={
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ADF029" strokeWidth="2">
+                    <polyline points="9 11 12 14 22 4"/>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                  </svg>
+                }
+              >
+                <div className="flex flex-col gap-2">
+                  {nextSteps.slice(0, 6).map((item: any, i: number) => (
+                    <div key={i} className="flex items-start gap-3 px-3 py-2 rounded-lg"
+                      style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                      <div className="flex-shrink-0 rounded-full flex items-center justify-center mt-0.5"
+                        style={{ width: 18, height: 18, background: "rgba(173,240,41,0.12)", border: "1px solid rgba(173,240,41,0.25)" }}>
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#ADF029" strokeWidth="3">
+                          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                      </div>
+                      <span style={{ fontSize: 12, color: "rgba(255,255,255,0.75)", lineHeight: 1.5 }}>
+                        {typeof item === "string" ? item : item.step}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </SectionCard>
+            );
+          })()}
 
           {/* 2. CLIENT SNAPSHOT */}
           <div className="flex flex-col lg:grid lg:grid-cols-3 gap-4">
@@ -1471,6 +1574,191 @@ export default function ClientDetailPage() {
           <span style={{ fontSize: 10, fontWeight: 700, fontFamily: "Industry, sans-serif", letterSpacing: "0.06em" }}>Docs</span>
         </button>
       </nav>
+
+      {/* ── Floating Client Chat ───────────────────────────────────────────── */}
+      <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 1000 }}>
+        {/* Chat panel */}
+        {chatOpen && (
+          <div style={{
+            position: "absolute", bottom: 64, right: 0,
+            width: 360, maxHeight: 520,
+            background: "#001f30", border: "1px solid rgba(31,195,239,0.25)",
+            borderRadius: 16, overflow: "hidden", display: "flex", flexDirection: "column",
+            boxShadow: "0 8px 40px rgba(0,0,0,0.5)",
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,0.08)",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              background: "rgba(31,195,239,0.08)",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1FC3EF" strokeWidth="2">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                </svg>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.9)", fontFamily: "Industry, sans-serif", letterSpacing: "0.04em" }}>
+                  ASK ABOUT {`${client.firstName} ${client.lastName}`.toUpperCase()}
+                </span>
+              </div>
+              <button onClick={() => setChatOpen(false)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.4)", padding: 2 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+
+            {/* Messages */}
+            <div style={{ flex: 1, overflowY: "auto", padding: "12px 14px", display: "flex", flexDirection: "column", gap: 10, minHeight: 200, maxHeight: 360 }}>
+              {chatHistory.length === 0 && (
+                <div style={{ textAlign: "center", marginTop: 24 }}>
+                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", lineHeight: 1.6 }}>
+                    Ask anything about this client — their vehicle preferences, budget, next steps, open questions, or anything from your meeting notes.
+                  </p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 16 }}>
+                    {["What car are they looking for?", "What are the open questions?", "What's the next step?"].map(q => (
+                      <button key={q} onClick={() => { setChatInput(q); }}
+                        style={{
+                          background: "rgba(31,195,239,0.07)", border: "1px solid rgba(31,195,239,0.2)",
+                          borderRadius: 8, padding: "6px 12px", cursor: "pointer",
+                          fontSize: 11, color: "rgba(255,255,255,0.6)", textAlign: "left",
+                        }}>
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {chatHistory.map((msg, i) => (
+                <div key={i} style={{
+                  alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+                  maxWidth: "85%",
+                }}>
+                  <div style={{
+                    padding: "8px 12px", borderRadius: msg.role === "user" ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
+                    background: msg.role === "user" ? "rgba(31,195,239,0.15)" : "rgba(255,255,255,0.06)",
+                    border: `1px solid ${msg.role === "user" ? "rgba(31,195,239,0.25)" : "rgba(255,255,255,0.08)"}`,
+                    fontSize: 12, color: "rgba(255,255,255,0.85)", lineHeight: 1.6,
+                    whiteSpace: "pre-wrap",
+                  }}>
+                    {msg.content}
+                  </div>
+                </div>
+              ))}
+              {chatLoading && (
+                <div style={{ alignSelf: "flex-start" }}>
+                  <div style={{
+                    padding: "8px 14px", borderRadius: "12px 12px 12px 2px",
+                    background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)",
+                  }}>
+                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                      {[0,1,2].map(i => (
+                        <div key={i} style={{
+                          width: 6, height: 6, borderRadius: "50%", background: "#1FC3EF",
+                          animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite`,
+                          opacity: 0.6,
+                        }} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Input */}
+            <div style={{ padding: "10px 12px", borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", gap: 8 }}>
+              <input
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={async e => {
+                  if (e.key === "Enter" && !e.shiftKey && chatInput.trim() && !chatLoading) {
+                    e.preventDefault();
+                    const userMsg = chatInput.trim();
+                    setChatInput("");
+                    const newHistory = [...chatHistory, { role: "user" as const, content: userMsg }];
+                    setChatHistory(newHistory);
+                    setChatLoading(true);
+                    try {
+                      const res = await fetch(`/api/clients/${client.id}/chat`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ message: userMsg, history: chatHistory }),
+                      });
+                      const data = await res.json();
+                      setChatHistory([...newHistory, { role: "assistant", content: data.reply ?? "Sorry, something went wrong." }]);
+                    } catch {
+                      setChatHistory([...newHistory, { role: "assistant", content: "Sorry, something went wrong. Please try again." }]);
+                    } finally {
+                      setChatLoading(false);
+                    }
+                  }
+                }}
+                placeholder="Ask anything about this client…"
+                style={{
+                  flex: 1, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+                  borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "rgba(255,255,255,0.85)",
+                  outline: "none", fontFamily: "inherit",
+                }}
+              />
+              <button
+                disabled={!chatInput.trim() || chatLoading}
+                onClick={async () => {
+                  const userMsg = chatInput.trim();
+                  if (!userMsg || chatLoading) return;
+                  setChatInput("");
+                  const newHistory = [...chatHistory, { role: "user" as const, content: userMsg }];
+                  setChatHistory(newHistory);
+                  setChatLoading(true);
+                  try {
+                    const res = await fetch(`/api/clients/${client.id}/chat`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ message: userMsg, history: chatHistory }),
+                    });
+                    const data = await res.json();
+                    setChatHistory([...newHistory, { role: "assistant", content: data.reply ?? "Sorry, something went wrong." }]);
+                  } catch {
+                    setChatHistory([...newHistory, { role: "assistant", content: "Sorry, something went wrong. Please try again." }]);
+                  } finally {
+                    setChatLoading(false);
+                  }
+                }}
+                style={{
+                  background: chatInput.trim() && !chatLoading ? "#1FC3EF" : "rgba(31,195,239,0.2)",
+                  border: "none", borderRadius: 8, padding: "8px 12px", cursor: chatInput.trim() && !chatLoading ? "pointer" : "default",
+                  display: "flex", alignItems: "center", justifyContent: "center", transition: "background 0.2s",
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={chatInput.trim() && !chatLoading ? "#001f30" : "rgba(31,195,239,0.5)"} strokeWidth="2.5">
+                  <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Toggle button */}
+        <button
+          onClick={() => setChatOpen(o => !o)}
+          style={{
+            width: 52, height: 52, borderRadius: "50%",
+            background: chatOpen ? "rgba(31,195,239,0.2)" : "#1FC3EF",
+            border: chatOpen ? "2px solid #1FC3EF" : "none",
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 4px 20px rgba(31,195,239,0.4)", transition: "all 0.2s",
+          }}
+        >
+          {chatOpen ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1FC3EF" strokeWidth="2.5">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          ) : (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#001f30" strokeWidth="2">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            </svg>
+          )}
+        </button>
+      </div>
     </div>
   );
 }
