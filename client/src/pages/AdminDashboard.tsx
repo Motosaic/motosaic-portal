@@ -540,7 +540,7 @@ export default function AdminDashboard() {
         <div className="flex-1 overflow-y-auto px-4 md:px-8 py-4 md:py-6 pb-24 lg:pb-6">
 
           {/* Pipeline Kanban */}
-          <KanbanBoard clients={clients} onNavigate={(id) => navigate(`/clients/${id}`)} />
+          <KanbanBoard clients={clients} onNavigate={(id) => navigate(`/admin/clients/${id}`)} />
 
           {/* Stats — 2-col on mobile, 4-col on desktop */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
