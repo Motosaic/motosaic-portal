@@ -99,6 +99,19 @@ addColumnIfMissing("clients", "suv_max_seating", "TEXT");
 addColumnIfMissing("clients", "powertrain", "TEXT");
 addColumnIfMissing("clients", "ev_long_range", "TEXT");
 addColumnIfMissing("clients", "priority_rankings", "TEXT");
+// Batch 3 questionnaire fields (2025 overhaul)
+addColumnIfMissing("clients", "budget_priority_stance", "TEXT");
+addColumnIfMissing("clients", "primary_use_cases", "TEXT");
+addColumnIfMissing("clients", "special_use_cases", "TEXT");
+addColumnIfMissing("clients", "passenger_requirement", "TEXT");
+addColumnIfMissing("clients", "children_in_vehicle", "TEXT");
+addColumnIfMissing("clients", "dog_space", "TEXT");
+addColumnIfMissing("clients", "third_row_usage", "TEXT");
+addColumnIfMissing("clients", "second_row_preference", "TEXT");
+addColumnIfMissing("clients", "home_charging", "TEXT");
+addColumnIfMissing("clients", "safety_tech_features", "TEXT");
+addColumnIfMissing("clients", "comfort_features", "TEXT");
+addColumnIfMissing("clients", "additional_notes", "TEXT");
 
 export interface IStorage {
   // Clients

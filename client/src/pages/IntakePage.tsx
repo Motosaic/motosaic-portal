@@ -248,7 +248,8 @@ function PriorityRankingStep({
   );
 }
 
-type HouseholdVehicle = { year: string; make: string };
+type HouseholdVehicle = { year: string; make: string; model?: string; trim?: string };
+type ChildEntry = { age: string; seatType: "car_seat" | "booster" | "neither" | "" };
 
 type FormData = {
   // Step 1
@@ -256,21 +257,38 @@ type FormData = {
   // Step 2
   purchaseType: string; budget: string; downPayment: string;
   monthlyPayment: string; annualMileage: string; creditScore: string; timeframe: string;
+  budgetPriorityStance: string; // "perfect_car" | "balanced" | "budget_ceiling"
   costcoMembership: string;  // "executive" | "standard" | "none"
   isVeteran: string;         // "yes" | "no"
   householdVehicles: HouseholdVehicle[];
   // Step 3
-  passengerCount: string;    // "1-2" | "3" | "4+"
+  primaryUseCases: string[];
+  specialUseCases: string;
+  passengerRequirement: string; // "just_me" | "2_adults" | "2_adults_1_2" | "2_adults_3_plus"
+  childrenRiding: string;       // "yes" | "no" (UI-only)
+  childrenInVehicle: ChildEntry[];
+  dogSpace: string;             // "yes" | "no"
+  thirdRowUsage: string;        // "daily" | "occasional" | "rarely"
+  secondRowPreference: string;  // see schema
   bodyStyles: string[]; preferredMakes: string[];
-  preferredModels: string; mustHaveFeatures: string; niceToHaveFeatures: string;
+  preferredModels: string;
   exteriorColors: string[]; interiorColors: string[];
-  suvSeatConfig: string;     // "captains" | "bench" | "no_preference"
-  suvMaxSeating: string;     // "6" | "7" | "8"
+  // Legacy (kept for column reuse)
+  passengerCount: string;
+  suvSeatConfig: string;
+  suvMaxSeating: string;
   suvNumChildren: string;
   suvChildAges: string;
-  suvHasPets: string;        // "yes" | "no"
-  powertrain: string;        // "ev" | "phev" | "gas" | "indifferent"
-  evLongRange: string;       // "yes" | "no" — only asked if powertrain === "ev"
+  suvHasPets: string;
+  // Powertrain
+  powertrain: string;        // "gas" | "hybrid" | "phev" | "ev" | "indifferent"
+  evLongRange: string;
+  homeCharging: string;      // "level2" | "level1" | "no_charging" | "na"
+  // Safety / Comfort chip lists
+  safetyTechFeatures: string[];
+  comfortFeatures: string[];
+  // Catch-all
+  additionalNotes: string;
   // Step 4
   hasTradeIn: boolean; tradeYear: string; tradeMake: string; tradeModel: string;
   tradeTrim: string; tradeMileage: string; tradeCondition: string; tradeOwed: string;
@@ -282,20 +300,77 @@ const initial: FormData = {
   firstName: "", lastName: "", address: "", city: "", state: "", zip: "",
   purchaseType: "finance", budget: "", downPayment: "",
   monthlyPayment: "", annualMileage: "", creditScore: "", timeframe: "",
+  budgetPriorityStance: "",
   costcoMembership: "", isVeteran: "",
   householdVehicles: [],
-  passengerCount: "",
+  primaryUseCases: [], specialUseCases: "",
+  passengerRequirement: "",
+  childrenRiding: "",
+  childrenInVehicle: [],
+  dogSpace: "",
+  thirdRowUsage: "",
+  secondRowPreference: "",
   bodyStyles: [], preferredMakes: [],
-  preferredModels: "", mustHaveFeatures: "", niceToHaveFeatures: "",
+  preferredModels: "",
   exteriorColors: [], interiorColors: [],
-  suvSeatConfig: "", suvMaxSeating: "", suvNumChildren: "", suvChildAges: "", suvHasPets: "",
+  passengerCount: "", suvSeatConfig: "", suvMaxSeating: "", suvNumChildren: "", suvChildAges: "", suvHasPets: "",
   powertrain: "", evLongRange: "",
+  homeCharging: "",
+  safetyTechFeatures: [],
+  comfortFeatures: [],
+  additionalNotes: "",
   hasTradeIn: false, tradeYear: "", tradeMake: "", tradeModel: "", tradeTrim: "",
   tradeMileage: "", tradeCondition: "", tradeOwed: "",
   priorityRankings: {},
 };
 
-const BODY_STYLES = ["Sedan", "SUV", "Truck", "Crossover", "Coupe", "Van/Minivan", "Convertible", "Wagon"];
+const BODY_STYLES = [
+  "Sedan", "Coupe", "SUV 2-row", "SUV 3-row", "Pickup Truck", "Minivan", "Wagon", "I'm flexible",
+];
+
+const PRIMARY_USE_CASES = [
+  "Daily driving & life errands",
+  "Long road trips",
+  "Towing & hauling",
+  "Off-road",
+  "Client-facing & business image",
+  "Weekend fun",
+];
+
+const SAFETY_TECH_CHIPS = [
+  "Adaptive cruise control",
+  "Full self-driving capability (Super Cruise, BlueCruise, Tesla FSD)",
+  "Lane keep assist",
+  "Lane centering",
+  "Blind-spot monitoring",
+  "360° surround-view camera",
+  "Rear cross-traffic alert",
+  "Automatic emergency braking",
+  "Rear automatic braking",
+  "Driver attention monitoring",
+  "Traffic sign recognition",
+  "Night vision",
+  "Head-up display (HUD)",
+  "Parking assist / self-parking",
+  "Just the basics is fine",
+];
+
+const COMFORT_CHIPS = [
+  "Ventilated / cooled front seats",
+  "Heated front seats",
+  "Heated rear seats",
+  "Heated steering wheel",
+  "Massaging seats",
+  "Multi-zone climate control",
+  "Rear-seat climate controls",
+  "Premium / upgraded interior materials",
+  "Panoramic or full-glass roof",
+  "Power-adjustable / memory seats",
+  "Easy-access second row (power sliding or folding)",
+  "Ambient / mood lighting",
+  "Premium audio system",
+  "Rear window shade / privacy glass",
+];
 
 const MAKES = [
   "Acura", "Audi", "Bentley", "BMW", "Buick", "Cadillac", "Chevrolet", "Chrysler", "Dodge",
@@ -305,27 +380,30 @@ const MAKES = [
 ];
 
 const EXTERIOR_COLORS = [
-  "White", "Black", "Silver", "Grey", "Blue", "Red", "Green", "Brown / Tan", "Orange", "Yellow", "Gold",
+  "Black", "White", "Silver", "Grey", "Blue", "Red", "Green", "Other",
 ];
 
-const INTERIOR_COLORS = ["Black", "Tan / Beige", "Brown", "Grey / White"];
+const INTERIOR_COLORS = ["Black", "Dark/Saddle Brown", "Tan", "Grey/White"];
 
 const CREDIT_RANGES = [
-  "Excellent (750+)", "Good (700–749)", "Fair (650–699)",
-  "Below Average (600–649)", "Poor (<600)", "Not sure",
+  "650 or below",
+  "650–700",
+  "700+",
 ];
 
 const TIMEFRAMES = [
-  "ASAP — need within two weeks",
-  "1–3 months",
-  "3+ months",
+  "ASAP",
+  "0–3 months",
+  "3–6 months",
+  "6–12 months",
+  "Just exploring",
 ];
 
 const ANNUAL_MILEAGE = [
-  "Less than 10,000 miles/year",
-  "10,000–12,000 miles/year",
-  "12,000–15,000 miles/year",
-  "More than 15,000 miles/year",
+  "10k or less",
+  "10–12k",
+  "12–15k",
+  "15k+",
 ];
 
 const STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
@@ -683,10 +761,7 @@ export default function IntakePage() {
   const [form, setForm] = useState<FormData>(initial);
   const [makesState, setMakesState] = useState<MakeState>({});
 
-  // Unified feature chip tri-state (0=neutral, 1=nice-to-have, 2=must-have)
-  type FeatureState = Record<string, 0 | 1 | 2>;
-  const [featureState, setFeatureState] = useState<FeatureState>({});
-  const [featureOther, setFeatureOther] = useState("");
+
 
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -729,31 +804,53 @@ export default function IntakePage() {
   const preferredMakes = Object.entries(makesState).filter(([,v]) => v === 1).map(([k]) => k);
   const notInterestedMakes = Object.entries(makesState).filter(([,v]) => v === -1).map(([k]) => k);
 
-  // Derive must-have and nice-to-have strings from unified featureState
-  const allChips = [...MUST_HAVE_CHIPS, ...NICE_TO_HAVE_CHIPS.filter(c => !MUST_HAVE_CHIPS.includes(c))];
-  const mustHaveFromState  = allChips.filter(c => (featureState[c] ?? 0) === 2);
-  const niceToHaveFromState = allChips.filter(c => (featureState[c] ?? 0) === 1);
-  const buildFeatureString = (chips: string[], other: string): string => {
-    const parts = [...chips];
-    if (other.trim()) parts.push(other.trim());
-    return parts.join(", ");
+
+  // Build the API payload — maps form state to schema column names
+  const buildPayload = (data: FormData) => {
+    // Map passengerRequirement → reuse passengerCount column
+    // Map secondRowPreference → reuse suvSeatConfig column
+    // "Anything additional?" maps to mustHaveFeatures column
+    const childrenJson = JSON.stringify(
+      data.childrenRiding === "yes" ? data.childrenInVehicle.filter(c => c.age.trim() || c.seatType) : []
+    );
+    return {
+      ...data,
+      bodyStyles: JSON.stringify(data.bodyStyles),
+      preferredMakes: JSON.stringify(preferredMakes),
+      notInterestedMakes: JSON.stringify(notInterestedMakes),
+      exteriorColors: JSON.stringify(data.exteriorColors),
+      interiorColors: JSON.stringify(data.interiorColors),
+      householdVehicles: JSON.stringify(data.householdVehicles),
+      // Catch-all field reuses must_have_features column
+      mustHaveFeatures: data.additionalNotes,
+      additionalNotes: data.additionalNotes,
+      // Clear out the legacy nice-to-have field
+      niceToHaveFeatures: "",
+      // New chip lists
+      safetyTechFeatures: JSON.stringify(data.safetyTechFeatures),
+      comfortFeatures: JSON.stringify(data.comfortFeatures),
+      // New scalar fields
+      budgetPriorityStance: data.budgetPriorityStance,
+      primaryUseCases: JSON.stringify(data.primaryUseCases),
+      specialUseCases: data.specialUseCases,
+      passengerRequirement: data.passengerRequirement,
+      // Reuse passenger_count column to also store the new requirement
+      passengerCount: data.passengerRequirement,
+      childrenInVehicle: childrenJson,
+      dogSpace: data.dogSpace,
+      thirdRowUsage: data.thirdRowUsage,
+      secondRowPreference: data.secondRowPreference,
+      // Reuse suv_seat_config to also hold second-row preference
+      suvSeatConfig: data.secondRowPreference,
+      homeCharging: data.homeCharging,
+      priorityRankings: JSON.stringify(data.priorityRankings),
+    };
   };
 
   // Save questionnaire and mark complete
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const payload = {
-        ...data,
-        bodyStyles: JSON.stringify(data.bodyStyles),
-        preferredMakes: JSON.stringify(preferredMakes),
-        notInterestedMakes: JSON.stringify(notInterestedMakes),
-        exteriorColors: JSON.stringify(data.exteriorColors),
-        interiorColors: JSON.stringify(data.interiorColors),
-        householdVehicles: JSON.stringify(data.householdVehicles),
-        mustHaveFeatures: buildFeatureString(mustHaveFromState, featureOther),
-        niceToHaveFeatures: buildFeatureString(niceToHaveFromState, ""),
-        priorityRankings: JSON.stringify(data.priorityRankings),
-      };
+      const payload = buildPayload(data);
       await apiRequest("PATCH", `/api/clients/${clientId}/questionnaire`, payload);
       const res = await apiRequest("POST", `/api/clients/${clientId}/questionnaire-complete`);
       return res.json();
@@ -768,30 +865,30 @@ export default function IntakePage() {
 
   // Auto-save on step change
   const saveProgress = async (data: FormData) => {
-    const payload = {
-      ...data,
-      bodyStyles: JSON.stringify(data.bodyStyles),
-      preferredMakes: JSON.stringify(preferredMakes),
-      notInterestedMakes: JSON.stringify(notInterestedMakes),
-      exteriorColors: JSON.stringify(data.exteriorColors),
-      interiorColors: JSON.stringify(data.interiorColors),
-      householdVehicles: JSON.stringify(data.householdVehicles),
-      mustHaveFeatures: buildFeatureString(mustHaveFromState, featureOther),
-      niceToHaveFeatures: buildFeatureString(niceToHaveFromState, ""),
-      priorityRankings: JSON.stringify(data.priorityRankings),
-    };
-    apiRequest("PATCH", `/api/clients/${clientId}/questionnaire`, payload).catch(() => {});
+    apiRequest("PATCH", `/api/clients/${clientId}/questionnaire`, buildPayload(data)).catch(() => {});
   };
 
   const [showHvError, setShowHvError] = useState(false);
 
   const validateStep = () => {
     if (isUAT) return true;
-    if (step === 0) return true;
+    if (step === 0) {
+      return !!(form.firstName.trim() && form.lastName.trim());
+    }
     if (step === 1) {
       if (!form.purchaseType) return false;
-      if (form.purchaseType === "cash") return !!form.timeframe;
-      return !!(form.creditScore && form.timeframe);
+      if (!form.timeframe) return false;
+      if (!form.annualMileage) return false;
+      if (!form.budgetPriorityStance) return false;
+      return true;
+    }
+    if (step === 2) {
+      if (form.primaryUseCases.length === 0) return false;
+      if (form.bodyStyles.length === 0) return false;
+      if (!form.passengerRequirement) return false;
+      if (!form.powertrain) return false;
+      if (isEVorPHEV && !form.homeCharging) return false;
+      return true;
     }
     return true;
   };
@@ -829,29 +926,45 @@ export default function IntakePage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const isCash = form.purchaseType === "cash";
-  const isLease = form.purchaseType === "lease";
-  const isFinance = form.purchaseType === "finance";
   const isUAT = existingClient ? isUATSession(existingClient.email ?? "", existingClient.phone ?? "") : false;
-  const hasSUV = form.bodyStyles.includes("SUV");
 
   const clientName = existingClient
     ? `${existingClient.firstName} ${existingClient.lastName}`
     : "";
 
   // ── Household vehicles helpers ──
-  const addHouseholdVehicle = () =>
-    set("householdVehicles", [...form.householdVehicles, { year: "", make: "" }]);
+  const addHouseholdVehicle = () => {
+    if (form.householdVehicles.length >= 4) return;
+    set("householdVehicles", [...form.householdVehicles, { year: "", make: "", model: "", trim: "" }]);
+  };
   const removeHouseholdVehicle = (i: number) => {
     const updated = form.householdVehicles.filter((_, idx) => idx !== i);
     set("householdVehicles", updated);
     // Clear any validation toast that may have fired before the row was removed
     setShowHvError(false);
   };
-  const updateHouseholdVehicle = (i: number, field: "year" | "make", value: string) => {
+  const updateHouseholdVehicle = (i: number, field: "year" | "make" | "model" | "trim", value: string) => {
     const updated = form.householdVehicles.map((v, idx) => idx === i ? { ...v, [field]: value } : v);
     set("householdVehicles", updated);
   };
+
+  // ── Children helpers ──
+  const addChild = () =>
+    set("childrenInVehicle", [...form.childrenInVehicle, { age: "", seatType: "" }]);
+  const removeChild = (i: number) => {
+    set("childrenInVehicle", form.childrenInVehicle.filter((_, idx) => idx !== i));
+  };
+  const updateChild = (i: number, field: "age" | "seatType", value: string) => {
+    const updated = form.childrenInVehicle.map((c, idx) =>
+      idx === i ? { ...c, [field]: value as ChildEntry["seatType"] | string } : c
+    );
+    set("childrenInVehicle", updated);
+  };
+
+  // Whether passenger requirement implies passengers besides the 2 adults
+  const passengersInclude = form.passengerRequirement === "2_adults_1_2" || form.passengerRequirement === "2_adults_3_plus";
+  const hasSUV3Row = form.bodyStyles.includes("SUV 3-row");
+  const isEVorPHEV = form.powertrain === "ev" || form.powertrain === "phev";
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(160deg, #002639 0%, #004363 60%, #003552 100%)" }}>
@@ -936,12 +1049,12 @@ export default function IntakePage() {
               </div>
             )}
 
-            {/* ── Step 2: Budget (Dynamic) ── */}
+            {/* ── Step 2: Financial Profile ── */}
             {step === 1 && (
               <div className="flex flex-col gap-5 md:gap-6">
-                <Field label="How will you purchase? *">
+                <Field label="Purchase Type *">
                   <ToggleGroup
-                    options={[["cash","Cash"],["finance","Finance / Loan"],["lease","Lease"]]}
+                    options={[["finance","Finance"],["lease","Lease"],["cash","Cash"]]}
                     value={form.purchaseType}
                     onChange={v => set("purchaseType", v)}
                     testPrefix="btn-purchase"
@@ -950,123 +1063,434 @@ export default function IntakePage() {
 
                 <div className="border-t" style={{ borderColor: "rgba(255,255,255,0.08)" }} />
 
-                {/* ── Cash ── */}
-                {isCash && (
-                  <div className="flex flex-col gap-4 md:gap-5 animate-in">
-                    <FieldRow>
-                      <Field label="Total Budget">
-                        <input className="intake-input" placeholder="$35,000" value={form.budget}
-                          onChange={e => set("budget", e.target.value)}
-                          onBlur={e => set("budget", formatCurrency(e.target.value))}
-                          data-testid="input-budget" />
-                      </Field>
-                      <Field label="Down Payment">
-                        <input className="intake-input" placeholder="$5,000" value={form.downPayment}
-                          onChange={e => set("downPayment", e.target.value)}
-                          onBlur={e => set("downPayment", formatCurrency(e.target.value))}
-                          data-testid="input-down-payment" />
-                      </Field>
-                    </FieldRow>
-                    <Field label="Purchase Timeframe *">
-                      <select className="intake-input" value={form.timeframe} onChange={e => set("timeframe", e.target.value)} data-testid="select-timeframe">
-                        <option value="">Select timeframe</option>
-                        {TIMEFRAMES.map(t => <option key={t} value={t}>{t}</option>)}
-                      </select>
-                    </Field>
-                  </div>
-                )}
+                {/* Free-form currency inputs (accept ranges like "50-60k") */}
+                <FieldRow>
+                  <Field label="Budget" hint="a number or a range, e.g. 50-60k">
+                    <input className="intake-input" placeholder="$35,000 or 30-40k" value={form.budget}
+                      onChange={e => set("budget", e.target.value)}
+                      data-testid="input-budget" />
+                  </Field>
+                  <Field label="Monthly Payment Target" hint="a number or a range">
+                    <input className="intake-input" placeholder="$499 or 450-550" value={form.monthlyPayment}
+                      onChange={e => set("monthlyPayment", e.target.value)}
+                      data-testid="input-monthly" />
+                  </Field>
+                </FieldRow>
 
-                {/* ── Finance ── */}
-                {isFinance && (
-                  <div className="flex flex-col gap-4 md:gap-5 animate-in">
-                    <FieldRow>
-                      <Field label="Total Budget">
-                        <input className="intake-input" placeholder="$35,000" value={form.budget}
-                          onChange={e => set("budget", e.target.value)}
-                          onBlur={e => set("budget", formatCurrency(e.target.value))}
-                          data-testid="input-budget" />
-                      </Field>
-                      <Field label="Down Payment">
-                        <input className="intake-input" placeholder="$5,000" value={form.downPayment}
-                          onChange={e => set("downPayment", e.target.value)}
-                          onBlur={e => set("downPayment", formatCurrency(e.target.value))}
-                          data-testid="input-down-payment" />
-                      </Field>
-                    </FieldRow>
-                    <FieldRow>
-                      <Field label="Credit Score Range *">
-                        <select className="intake-input" value={form.creditScore} onChange={e => set("creditScore", e.target.value)} data-testid="select-credit">
-                          <option value="">Select range</option>
-                          {CREDIT_RANGES.map(r => <option key={r} value={r}>{r}</option>)}
-                        </select>
-                      </Field>
-                      <Field label="Purchase Timeframe *">
-                        <select className="intake-input" value={form.timeframe} onChange={e => set("timeframe", e.target.value)} data-testid="select-timeframe">
-                          <option value="">Select timeframe</option>
-                          {TIMEFRAMES.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                      </Field>
-                    </FieldRow>
-                  </div>
-                )}
+                <Field label="Down Payment" hint="a number or a range">
+                  <input className="intake-input" placeholder="$5,000 or 3-7k" value={form.downPayment}
+                    onChange={e => set("downPayment", e.target.value)}
+                    data-testid="input-down-payment" />
+                </Field>
 
-                {/* ── Lease ── */}
-                {isLease && (
-                  <div className="flex flex-col gap-4 md:gap-5 animate-in">
-                    <FieldRow>
-                      <Field label="Target Monthly Payment">
-                        <input className="intake-input" placeholder="$499/mo" value={form.monthlyPayment}
-                          onChange={e => set("monthlyPayment", e.target.value)}
-                          onBlur={e => set("monthlyPayment", formatCurrency(e.target.value))}
-                          data-testid="input-monthly" />
-                      </Field>
-                      <Field label="Down Payment">
-                        <input className="intake-input" placeholder="$2,000" value={form.downPayment}
-                          onChange={e => set("downPayment", e.target.value)}
-                          onBlur={e => set("downPayment", formatCurrency(e.target.value))}
-                          data-testid="input-down-payment" />
-                      </Field>
-                    </FieldRow>
-                    <Field label="How many miles do you drive per year?">
-                      <select className="intake-input" value={form.annualMileage} onChange={e => set("annualMileage", e.target.value)} data-testid="select-mileage">
-                        <option value="">Select mileage</option>
-                        {ANNUAL_MILEAGE.map(m => <option key={m} value={m}>{m}</option>)}
-                      </select>
-                    </Field>
-                    <FieldRow>
-                      <Field label="Credit Score Range *">
-                        <select className="intake-input" value={form.creditScore} onChange={e => set("creditScore", e.target.value)} data-testid="select-credit">
-                          <option value="">Select range</option>
-                          {CREDIT_RANGES.map(r => <option key={r} value={r}>{r}</option>)}
-                        </select>
-                      </Field>
-                      <Field label="Purchase Timeframe *">
-                        <select className="intake-input" value={form.timeframe} onChange={e => set("timeframe", e.target.value)} data-testid="select-timeframe">
-                          <option value="">Select timeframe</option>
-                          {TIMEFRAMES.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                      </Field>
-                    </FieldRow>
-                  </div>
-                )}
+                <FieldRow>
+                  <Field label="Credit Score">
+                    <select className="intake-input" value={form.creditScore} onChange={e => set("creditScore", e.target.value)} data-testid="select-credit">
+                      <option value="">Select range</option>
+                      {CREDIT_RANGES.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Purchase Timeframe *">
+                    <select className="intake-input" value={form.timeframe} onChange={e => set("timeframe", e.target.value)} data-testid="select-timeframe">
+                      <option value="">Select timeframe</option>
+                      {TIMEFRAMES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </Field>
+                </FieldRow>
 
-                <SectionDivider label="Savings & Incentives" />
-
-                {/* Costco membership */}
-                <Field label="Do you have a Costco membership?">
-                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 4, marginBottom: 8, lineHeight: 1.5 }}>
-                    Costco members regularly receive exclusive discounts — worth checking before we begin.
-                  </p>
+                <Field label="Annual Miles *">
                   <ToggleGroup
-                    options={[["executive","Yes, Executive"],["standard","Yes, Standard"],["none","No"]]}
-                    value={form.costcoMembership}
+                    options={ANNUAL_MILEAGE.map(m => [m, m] as [string, string])}
+                    value={form.annualMileage}
+                    onChange={v => set("annualMileage", v)}
+                    testPrefix="btn-miles"
+                  />
+                </Field>
+
+                <Field label="Budget Priority Stance *" hint="how strict is your ceiling?">
+                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 4, marginBottom: 6, lineHeight: 1.5 }}>
+                    Helps us calibrate trade-offs between fit and price.
+                  </p>
+                  <div className="flex flex-col gap-2 mt-1">
+                    {([
+                      ["perfect_car", "Perfect car matters most"],
+                      ["balanced", "Balanced"],
+                      ["budget_ceiling", "Budget is the ceiling"],
+                    ] as [string, string][]).map(([v, l]) => (
+                      <button key={v} type="button" onClick={() => set("budgetPriorityStance", v)}
+                        className="rounded-xl font-bold transition-all text-left"
+                        style={{
+                          background: form.budgetPriorityStance === v ? "var(--miami-blue)" : "rgba(255,255,255,0.07)",
+                          color: form.budgetPriorityStance === v ? "var(--shelby-blue)" : "rgba(255,255,255,0.85)",
+                          border: `1px solid ${form.budgetPriorityStance === v ? "var(--miami-blue)" : "rgba(255,255,255,0.1)"}`,
+                          fontFamily: "Industry, sans-serif",
+                          fontSize: 13,
+                          minHeight: 44,
+                          padding: "10px 14px",
+                        }}
+                        data-testid={`btn-bps-${v}`}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+
+              </div>
+            )}
+
+            {/* ── Step 3: Vehicle Preferences ── */}
+            {step === 2 && (
+              <div className="flex flex-col gap-5">
+
+                {/* USE & LIFESTYLE */}
+                <SectionDivider label="Use & Lifestyle" />
+                <Field label="Primary Use Cases *" hint="select all that apply">
+                  <MultiSelect
+                    options={PRIMARY_USE_CASES}
+                    value={form.primaryUseCases}
+                    onChange={v => set("primaryUseCases", v)}
+                  />
+                </Field>
+                <Field label="Special Use Cases" hint="optional">
+                  <textarea
+                    className="intake-input"
+                    placeholder="Car camping, teen drivers, mobility needs, anything else..."
+                    value={form.specialUseCases}
+                    onChange={e => set("specialUseCases", e.target.value)}
+                    rows={3}
+                    style={{ resize: "vertical", minHeight: 76 }}
+                    data-testid="input-special-use-cases"
+                  />
+                </Field>
+
+                {/* BODY STYLE & SIZE */}
+                <SectionDivider label="Body Style & Size" />
+                <Field label="Body Styles *" hint="select all that apply">
+                  <MultiSelect options={BODY_STYLES} value={form.bodyStyles} onChange={v => set("bodyStyles", v)} />
+                </Field>
+
+                <Field label="Passengers in this vehicle *">
+                  <div className="flex flex-col gap-2 mt-1">
+                    {([
+                      ["just_me", "Just me"],
+                      ["2_adults", "2 adults"],
+                      ["2_adults_1_2", "2 adults + 1–2 passengers"],
+                      ["2_adults_3_plus", "2 adults + 3+ passengers"],
+                    ] as [string, string][]).map(([v, l]) => (
+                      <button key={v} type="button" onClick={() => set("passengerRequirement", v)}
+                        className="rounded-xl font-bold transition-all text-left"
+                        style={{
+                          background: form.passengerRequirement === v ? "var(--miami-blue)" : "rgba(255,255,255,0.07)",
+                          color: form.passengerRequirement === v ? "var(--shelby-blue)" : "rgba(255,255,255,0.85)",
+                          border: `1px solid ${form.passengerRequirement === v ? "var(--miami-blue)" : "rgba(255,255,255,0.1)"}`,
+                          fontFamily: "Industry, sans-serif",
+                          fontSize: 13,
+                          minHeight: 44,
+                          padding: "10px 14px",
+                        }}
+                        data-testid={`btn-pax-${v}`}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+
+                {passengersInclude && (
+                  <div className="rounded-xl p-4 flex flex-col gap-4 animate-in"
+                    style={{ background: "rgba(31,195,239,0.05)", border: "1px solid rgba(31,195,239,0.12)" }}>
+                    <Field label="Will any children be riding?">
+                      <ToggleGroup
+                        options={[["yes","Yes"],["no","No"]]}
+                        value={form.childrenRiding}
+                        onChange={v => set("childrenRiding", v)}
+                        testPrefix="btn-children-riding"
+                      />
+                    </Field>
+
+                    {form.childrenRiding === "yes" && (
+                      <div>
+                        <label className="intake-label">Children</label>
+                        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 4, marginBottom: 8, lineHeight: 1.5 }}>
+                          For each child, enter the age and seat type. Helps us flag interior space and seat-mounting requirements.
+                        </p>
+                        <div className="flex flex-col gap-2 mb-3">
+                          {(form.childrenInVehicle.length === 0 ? [{ age: "", seatType: "" as ChildEntry["seatType"] }] : form.childrenInVehicle).map((c, i) => {
+                            // Lazy-init: ensure form has at least 1 row when first opened
+                            if (form.childrenInVehicle.length === 0 && i === 0) {
+                              // We render a placeholder row but it's not yet in state — commit on first edit
+                            }
+                            const seatOptions: [ChildEntry["seatType"], string][] = [
+                              ["car_seat", "Car Seat"],
+                              ["booster", "Booster"],
+                              ["neither", "Neither"],
+                            ];
+                            const ensureRow = () => {
+                              if (form.childrenInVehicle.length === 0) {
+                                set("childrenInVehicle", [{ age: "", seatType: "" }]);
+                              }
+                            };
+                            return (
+                              <div key={i} className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                                <input
+                                  className="intake-input"
+                                  placeholder="Age"
+                                  inputMode="numeric"
+                                  style={{ maxWidth: 120 }}
+                                  value={c.age}
+                                  onFocus={ensureRow}
+                                  onChange={e => {
+                                    if (form.childrenInVehicle.length === 0) {
+                                      set("childrenInVehicle", [{ age: e.target.value, seatType: "" }]);
+                                    } else {
+                                      updateChild(i, "age", e.target.value);
+                                    }
+                                  }}
+                                  data-testid={`input-child-age-${i}`}
+                                />
+                                <div className="flex gap-1 flex-wrap">
+                                  {seatOptions.map(([v, l]) => (
+                                    <button
+                                      key={v}
+                                      type="button"
+                                      onClick={() => {
+                                        if (form.childrenInVehicle.length === 0) {
+                                          set("childrenInVehicle", [{ age: "", seatType: v }]);
+                                        } else {
+                                          updateChild(i, "seatType", v as string);
+                                        }
+                                      }}
+                                      className="px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150"
+                                      style={{
+                                        background: c.seatType === v ? "var(--miami-blue)" : "rgba(255,255,255,0.07)",
+                                        color: c.seatType === v ? "var(--shelby-blue)" : "rgba(255,255,255,0.75)",
+                                        border: `1px solid ${c.seatType === v ? "var(--miami-blue)" : "rgba(255,255,255,0.1)"}`,
+                                        fontFamily: "Industry, sans-serif",
+                                        minHeight: 40,
+                                      }}
+                                      data-testid={`btn-child-${i}-${v}`}
+                                    >
+                                      {l}
+                                    </button>
+                                  ))}
+                                </div>
+                                {form.childrenInVehicle.length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeChild(i)}
+                                    style={{ color: "rgba(255,255,255,0.78)", fontSize: 20, minWidth: 36, minHeight: 36 }}
+                                    className="flex items-center justify-center hover:text-red-400 transition-colors"
+                                    data-testid={`btn-remove-child-${i}`}
+                                  >×</button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={addChild}
+                          data-testid="btn-add-child"
+                          className="rounded-xl font-bold transition-all active:scale-95"
+                          style={{
+                            background: "rgba(31,195,239,0.08)",
+                            color: "var(--miami-blue)",
+                            border: "1px solid rgba(31,195,239,0.2)",
+                            fontFamily: "Industry, sans-serif",
+                            fontSize: 13,
+                            minHeight: 44,
+                            padding: "0 20px",
+                          }}
+                        >
+                          + Add child
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <Field label="Do we need to account for dog space?">
+                  <ToggleGroup
+                    options={[["yes","Yes"],["no","No"]]}
+                    value={form.dogSpace}
+                    onChange={v => set("dogSpace", v)}
+                    testPrefix="btn-dog-space"
+                  />
+                </Field>
+
+                {hasSUV3Row && (
+                  <div className="rounded-xl p-4 flex flex-col gap-4 animate-in"
+                    style={{ background: "rgba(31,195,239,0.05)", border: "1px solid rgba(31,195,239,0.12)" }}>
+                    <p style={{ fontSize: 12, fontWeight: 700, color: "var(--miami-blue)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                      3-Row SUV Details
+                    </p>
+                    <Field label="3rd-Row Usage Intent">
+                      <ToggleGroup
+                        options={[
+                          ["daily", "Regular daily use"],
+                          ["occasional", "Occasional guests"],
+                          ["rarely", "Rarely — just need the option"],
+                        ]}
+                        value={form.thirdRowUsage}
+                        onChange={v => set("thirdRowUsage", v)}
+                        testPrefix="btn-3rd-row"
+                      />
+                    </Field>
+                    <Field label="2nd-Row Seating Preference">
+                      <div className="flex flex-col gap-2 mt-1">
+                        {([
+                          ["bench_only", "Bench only"],
+                          ["bench_preferred", "Bench preferred"],
+                          ["captains_only", "Captain's only"],
+                          ["captains_preferred", "Captain's preferred"],
+                          ["captains_if_necessary", "Captain's if necessary"],
+                          ["no_preference", "No preference"],
+                        ] as [string, string][]).map(([v, l]) => (
+                          <button key={v} type="button" onClick={() => set("secondRowPreference", v)}
+                            className="rounded-xl font-bold transition-all text-left"
+                            style={{
+                              background: form.secondRowPreference === v ? "var(--miami-blue)" : "rgba(255,255,255,0.07)",
+                              color: form.secondRowPreference === v ? "var(--shelby-blue)" : "rgba(255,255,255,0.85)",
+                              border: `1px solid ${form.secondRowPreference === v ? "var(--miami-blue)" : "rgba(255,255,255,0.1)"}`,
+                              fontFamily: "Industry, sans-serif",
+                              fontSize: 13,
+                              minHeight: 40,
+                              padding: "8px 14px",
+                            }}
+                            data-testid={`btn-2nd-row-${v}`}>
+                            {l}
+                          </button>
+                        ))}
+                      </div>
+                    </Field>
+                  </div>
+                )}
+
+                {/* MAKES & MODELS */}
+                <SectionDivider label="Makes & Models" />
+                <div>
+                  <label className="intake-label">Preferred / Not-interested Makes</label>
+                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 4, marginBottom: 6, lineHeight: 1.5 }}>
+                    Tap once for ✓ preferred (green) · tap again for ✕ not interested (red) · tap again to clear.
+                    You don't have to weigh in on every brand — just the ones that matter to you.
+                  </p>
+                  <TriStateMakes makes={MAKES} state={makesState} onChange={setMakesState} />
+                </div>
+                <Field label="Specific Models of Interest">
+                  <input className="intake-input" placeholder="e.g. RAV4, F-150, 3 Series..." value={form.preferredModels}
+                    onChange={e => set("preferredModels", e.target.value)} data-testid="input-models" />
+                </Field>
+
+                {/* POWERTRAIN */}
+                <SectionDivider label="Powertrain" />
+                <Field label="Powertrain *">
+                  <div className="flex flex-col gap-2 mt-1">
+                    {([
+                      ["gas", "Gasoline"],
+                      ["hybrid", "Hybrid (no plug)"],
+                      ["phev", "PHEV"],
+                      ["ev", "Fully Electric"],
+                      ["indifferent", "Open to guidance"],
+                    ] as [string, string][]).map(([v, l]) => (
+                      <button key={v} type="button" onClick={() => set("powertrain", v)}
+                        className="rounded-xl font-bold transition-all text-left"
+                        style={{
+                          background: form.powertrain === v ? "var(--miami-blue)" : "rgba(255,255,255,0.07)",
+                          color: form.powertrain === v ? "var(--shelby-blue)" : "rgba(255,255,255,0.85)",
+                          border: `1px solid ${form.powertrain === v ? "var(--miami-blue)" : "rgba(255,255,255,0.1)"}`,
+                          fontFamily: "Industry, sans-serif",
+                          fontSize: 13,
+                          minHeight: 44,
+                          padding: "10px 14px",
+                        }}
+                        data-testid={`btn-powertrain-${v}`}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+
+                {isEVorPHEV && (
+                  <Field label="Home Charging Situation *">
+                    <div className="flex flex-col gap-2 mt-1">
+                      {([
+                        ["level2", "Dedicated home charger (Level 2)"],
+                        ["level1", "Standard outlet only (Level 1)"],
+                        ["no_charging", "No home charging — apartment/condo"],
+                        ["na", "N/A"],
+                      ] as [string, string][]).map(([v, l]) => (
+                        <button key={v} type="button" onClick={() => set("homeCharging", v)}
+                          className="rounded-xl font-bold transition-all text-left"
+                          style={{
+                            background: form.homeCharging === v ? "var(--miami-blue)" : "rgba(255,255,255,0.07)",
+                            color: form.homeCharging === v ? "var(--shelby-blue)" : "rgba(255,255,255,0.85)",
+                            border: `1px solid ${form.homeCharging === v ? "var(--miami-blue)" : "rgba(255,255,255,0.1)"}`,
+                            fontFamily: "Industry, sans-serif",
+                            fontSize: 13,
+                            minHeight: 44,
+                            padding: "10px 14px",
+                          }}
+                          data-testid={`btn-home-charging-${v}`}>
+                          {l}
+                        </button>
+                      ))}
+                    </div>
+                  </Field>
+                )}
+
+                {/* SAFETY & TECHNOLOGY */}
+                <SectionDivider label="Safety & Technology" />
+                <Field label="Safety & Tech Features" hint="select all that apply">
+                  <MultiSelect
+                    options={SAFETY_TECH_CHIPS}
+                    value={form.safetyTechFeatures}
+                    onChange={v => set("safetyTechFeatures", v)}
+                  />
+                </Field>
+
+                {/* COMFORT & INTERIOR */}
+                <SectionDivider label="Comfort & Interior" />
+                <Field label="Comfort Features" hint="select all that apply">
+                  <MultiSelect
+                    options={COMFORT_CHIPS}
+                    value={form.comfortFeatures}
+                    onChange={v => set("comfortFeatures", v)}
+                  />
+                </Field>
+
+                {/* COLORS */}
+                <SectionDivider label="Colors" />
+                <Field label="Exterior Colors" hint="select all that apply">
+                  <MultiSelect options={EXTERIOR_COLORS} value={form.exteriorColors} onChange={v => set("exteriorColors", v)} />
+                </Field>
+                <Field label="Interior Colors" hint="select all that apply">
+                  <MultiSelect options={INTERIOR_COLORS} value={form.interiorColors} onChange={v => set("interiorColors", v)} />
+                </Field>
+
+                {/* ANYTHING ADDITIONAL */}
+                <SectionDivider label="Anything additional?" />
+                <Field label="Anything additional?">
+                  <textarea
+                    className="intake-input"
+                    placeholder="Any remaining must-haves, hard deal-breakers, or special requirements we haven't covered?"
+                    value={form.additionalNotes}
+                    onChange={e => set("additionalNotes", e.target.value)}
+                    rows={4}
+                    style={{ resize: "vertical", minHeight: 96 }}
+                    data-testid="input-additional-notes"
+                  />
+                </Field>
+
+                {/* LIFESTYLE & PERKS */}
+                <SectionDivider label="Lifestyle & Perks" />
+                <Field label="Costco Member (3+ months)?">
+                  <ToggleGroup
+                    options={[["standard","Yes"],["none","No"]]}
+                    value={form.costcoMembership === "executive" ? "standard" : form.costcoMembership}
                     onChange={v => set("costcoMembership", v)}
                     testPrefix="btn-costco"
                   />
                 </Field>
-
-                {/* Veteran / First Responder */}
-                <Field label="Are you a veteran or first responder?">
+                <Field label="Active Military / Veteran?">
                   <ToggleGroup
                     options={[["yes","Yes"],["no","No"]]}
                     value={form.isVeteran}
@@ -1075,13 +1499,10 @@ export default function IntakePage() {
                   />
                 </Field>
 
-                <SectionDivider label="Loyalty Incentives" />
-
-                {/* Household vehicles */}
                 <div>
                   <label className="intake-label">
-                    What vehicles are currently in your household?
-                    <span style={{ fontWeight: 400, color: "rgba(255,255,255,0.82)", fontSize: 11, marginLeft: 6 }}>(year and make)</span>
+                    Household Vehicles currently owned
+                    <span style={{ fontWeight: 400, color: "rgba(255,255,255,0.82)", fontSize: 11, marginLeft: 6 }}>(up to 4)</span>
                   </label>
                   <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 4, marginBottom: 8, lineHeight: 1.5 }}>
                     Existing brand ownership can unlock loyalty pricing.
@@ -1091,202 +1512,69 @@ export default function IntakePage() {
                       {form.householdVehicles.map((v, i) => {
                         const rowIncomplete = showHvError && (!v.year.trim() || !v.make.trim());
                         return (
-                        <div key={i} className="flex gap-2 items-center">
-                          <input
-                            className="intake-input flex-1"
-                            placeholder="Year (e.g. 2019)"
-                            value={v.year}
-                            onChange={e => { updateHouseholdVehicle(i, "year", e.target.value); setShowHvError(false); }}
-                            data-testid={`input-hv-year-${i}`}
-                            style={rowIncomplete && !v.year.trim() ? { borderColor: "#ef4444" } : {}}
-                          />
-                          <input
-                            className="intake-input flex-1"
-                            placeholder="Make (e.g. Toyota)"
-                            value={v.make}
-                            onChange={e => { updateHouseholdVehicle(i, "make", e.target.value); setShowHvError(false); }}
-                            data-testid={`input-hv-make-${i}`}
-                            style={rowIncomplete && !v.make.trim() ? { borderColor: "#ef4444" } : {}}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeHouseholdVehicle(i)}
-                            style={{ color: "rgba(255,255,255,0.78)", fontSize: 20, minWidth: 36, minHeight: 36, flexShrink: 0 }}
-                            className="flex items-center justify-center hover:text-red-400 transition-colors"
-                            data-testid={`btn-remove-hv-${i}`}
-                          >×</button>
-                        </div>
+                          <div key={i} className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                            <input
+                              className="intake-input"
+                              placeholder="Year"
+                              style={{ maxWidth: 100 }}
+                              value={v.year}
+                              onChange={e => { updateHouseholdVehicle(i, "year", e.target.value); setShowHvError(false); }}
+                              data-testid={`input-hv-year-${i}`}
+                            />
+                            <input
+                              className="intake-input flex-1"
+                              placeholder="Make"
+                              value={v.make}
+                              onChange={e => { updateHouseholdVehicle(i, "make", e.target.value); setShowHvError(false); }}
+                              data-testid={`input-hv-make-${i}`}
+                              style={rowIncomplete && !v.make.trim() ? { borderColor: "#ef4444" } : {}}
+                            />
+                            <input
+                              className="intake-input flex-1"
+                              placeholder="Model"
+                              value={v.model || ""}
+                              onChange={e => updateHouseholdVehicle(i, "model", e.target.value)}
+                              data-testid={`input-hv-model-${i}`}
+                            />
+                            <input
+                              className="intake-input flex-1"
+                              placeholder="Trim"
+                              value={v.trim || ""}
+                              onChange={e => updateHouseholdVehicle(i, "trim", e.target.value)}
+                              data-testid={`input-hv-trim-${i}`}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeHouseholdVehicle(i)}
+                              style={{ color: "rgba(255,255,255,0.78)", fontSize: 20, minWidth: 36, minHeight: 36, flexShrink: 0 }}
+                              className="flex items-center justify-center hover:text-red-400 transition-colors"
+                              data-testid={`btn-remove-hv-${i}`}
+                            >×</button>
+                          </div>
                         );
                       })}
                     </div>
                   )}
-                  <button
-                    type="button"
-                    onClick={addHouseholdVehicle}
-                    data-testid="btn-add-hv"
-                    className="rounded-xl font-bold transition-all active:scale-95"
-                    style={{
-                      background: "rgba(31,195,239,0.08)",
-                      color: "var(--miami-blue)",
-                      border: "1px solid rgba(31,195,239,0.2)",
-                      fontFamily: "Industry, sans-serif",
-                      fontSize: 13,
-                      minHeight: 44,
-                      padding: "0 20px",
-                    }}
-                  >
-                    + Add Vehicle
-                  </button>
+                  {form.householdVehicles.length < 4 && (
+                    <button
+                      type="button"
+                      onClick={addHouseholdVehicle}
+                      data-testid="btn-add-hv"
+                      className="rounded-xl font-bold transition-all active:scale-95"
+                      style={{
+                        background: "rgba(31,195,239,0.08)",
+                        color: "var(--miami-blue)",
+                        border: "1px solid rgba(31,195,239,0.2)",
+                        fontFamily: "Industry, sans-serif",
+                        fontSize: 13,
+                        minHeight: 44,
+                        padding: "0 20px",
+                      }}
+                    >
+                      + Add Vehicle
+                    </button>
+                  )}
                 </div>
-              </div>
-            )}
-
-            {/* ── Step 3: Vehicle Preferences ── */}
-            {step === 2 && (
-              <div className="flex flex-col gap-5">
-
-                {/* Passengers FIRST */}
-                <Field label="How many people will regularly be riding in it?">
-                  <ToggleGroup
-                    options={[["1-2","1–2 people"],["3","Up to 3"],["4+","4 or more"]]}
-                    value={form.passengerCount}
-                    onChange={v => set("passengerCount", v)}
-                    testPrefix="btn-passengers"
-                  />
-                </Field>
-
-                <div className="border-t" style={{ borderColor: "rgba(255,255,255,0.08)" }} />
-
-                {/* Body styles */}
-                <Field label="Body Style (select all that apply)">
-                  <MultiSelect options={BODY_STYLES} value={form.bodyStyles} onChange={v => set("bodyStyles", v)} />
-                </Field>
-
-                {/* Dynamic SUV follow-up */}
-                {hasSUV && (
-                  <div className="rounded-xl p-4 flex flex-col gap-4 animate-in"
-                    style={{ background: "rgba(31,195,239,0.05)", border: "1px solid rgba(31,195,239,0.12)" }}>
-                    <p style={{ fontSize: 12, fontWeight: 700, color: "var(--miami-blue)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
-                      SUV Details
-                    </p>
-
-                    <Field label="Seating configuration preference">
-                      <ToggleGroup
-                        options={[["captains","Captain's Chairs"],["bench","Bench Seat"],["no_preference","No Preference"]]}
-                        value={form.suvSeatConfig}
-                        onChange={v => set("suvSeatConfig", v)}
-                        testPrefix="btn-suv-seats"
-                      />
-                    </Field>
-
-                    <Field label="Which seating configurations work for you?">
-                      <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 4, marginBottom: 6, lineHeight: 1.5 }}>
-                        Captain's chairs in the middle row give you 6 seats (2+2+2) with a walk-through to the third row. A bench bumps it to 7 (2+3+2) or 8 (2+3+3) depending on the third row configuration. Third rows vary — some fit 2–3 adults comfortably, others are really only sized for kids.
-                      </p>
-                      <MultiSelect
-                        options={["Seats 6", "Seats 7", "Seats 8"]}
-                        value={form.suvMaxSeating ? form.suvMaxSeating.split(",").map(s => s.trim()).filter(Boolean) : []}
-                        onChange={v => set("suvMaxSeating", v.join(", "))}
-                      />
-                    </Field>
-
-                    <Field label="Number of children riding regularly">
-                      <ToggleGroup
-                        options={[["0","0"],["1","1"],["2","2"],["3","3"],["4+","4+"]]}
-                        value={form.suvNumChildren}
-                        onChange={v => set("suvNumChildren", v)}
-                        testPrefix="btn-suv-children"
-                      />
-                    </Field>
-
-                    {form.suvNumChildren && form.suvNumChildren !== "0" && (
-                      <Field label="Ages of children" hint="approximate is fine">
-                        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 4, marginBottom: 6, lineHeight: 1.5 }}>
-                          Helps us flag seating that fits a booster seat, child seat, or neither — especially important for third-row and captain's chair configurations.
-                        </p>
-                        <input
-                          className="intake-input"
-                          placeholder="e.g. 4, 7, 12"
-                          value={form.suvChildAges}
-                          onChange={e => set("suvChildAges", e.target.value)}
-                          data-testid="input-suv-child-ages"
-                        />
-                      </Field>
-                    )}
-
-                    <Field label="Do you have dogs or regularly haul large cargo?">
-                      <ToggleGroup
-                        options={[["yes","Yes"],["no","No"]]}
-                        value={form.suvHasPets}
-                        onChange={v => set("suvHasPets", v)}
-                        testPrefix="btn-suv-pets"
-                      />
-                    </Field>
-                  </div>
-                )}
-
-                {/* Powertrain preference */}
-                <Field label="What type of powertrain are you open to?">
-                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 4, marginBottom: 6, lineHeight: 1.5 }}>
-                    Helps us understand whether EVs, plug-in hybrids, or traditional gas vehicles are worth exploring together.
-                  </p>
-                  <ToggleGroup
-                    options={[["ev","Electric (EV)"],["phev","Plug-In Hybrid"],["gas","Gas Only"],["indifferent","Open to Any"]]}
-                    value={form.powertrain}
-                    onChange={v => set("powertrain", v)}
-                    testPrefix="btn-powertrain"
-                  />
-                </Field>
-
-                {form.powertrain === "ev" && (
-                  <Field label="Do you regularly drive more than 200 miles in a single day?">
-                    <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 4, marginBottom: 6, lineHeight: 1.5 }}>
-                      Most EVs have a 200–300 mile range. If long daily drives are common, we'll focus on longer-range models or those with fast-charging networks along your routes.
-                    </p>
-                    <ToggleGroup
-                      options={[["yes","Yes, regularly"],["no","No, rarely or never"]]}
-                      value={form.evLongRange}
-                      onChange={v => set("evLongRange", v)}
-                      testPrefix="btn-ev-range"
-                    />
-                  </Field>
-                )}
-
-                {/* Brands section — renamed */}
-                <div>
-                  <label className="intake-label">Love It or Leave It — Your Best &amp; Worst Brands</label>
-                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 4, marginBottom: 6, lineHeight: 1.5 }}>
-                    Tap once for ✓ preferred (green) · tap again for ✕ not interested (red) · tap again to clear.
-                    You don't have to weigh in on every brand — just the ones that matter to you.
-                  </p>
-                  <TriStateMakes makes={MAKES} state={makesState} onChange={setMakesState} />
-                </div>
-
-                <Field label="Specific Models in Mind">
-                  <input className="intake-input" placeholder="e.g. RAV4, F-150, 3 Series..." value={form.preferredModels}
-                    onChange={e => set("preferredModels", e.target.value)} data-testid="input-models" />
-                </Field>
-
-                {/* Unified feature chip selector */}
-                <div>
-                  <label className="intake-label">Features That Matter to You</label>
-                  <TriStateFeatureChips
-                    chips={MUST_HAVE_CHIPS}
-                    state={featureState}
-                    onChange={setFeatureState}
-                    otherValue={featureOther}
-                    onOtherChange={setFeatureOther}
-                  />
-                </div>
-
-                <div className="border-t" style={{ borderColor: "rgba(255,255,255,0.08)" }} />
-
-                <Field label="Exterior Color Preference (select all that apply)">
-                  <MultiSelect options={EXTERIOR_COLORS} value={form.exteriorColors} onChange={v => set("exteriorColors", v)} />
-                </Field>
-                <Field label="Interior Color Preference (select all that apply)">
-                  <MultiSelect options={INTERIOR_COLORS} value={form.interiorColors} onChange={v => set("interiorColors", v)} />
-                </Field>
               </div>
             )}
 

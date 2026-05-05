@@ -7,8 +7,52 @@ const NOTIFY_TO   = process.env.NOTIFY_EMAIL || "mike@motosaic.com";
 const NOTIFY_FROM = process.env.NOTIFY_FROM_EMAIL || "mike@motosaic.com";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-function parseJsonArr(str?: string | null): string[] {
+function parseJsonArr(str?: string | null): any[] {
   try { return JSON.parse(str || "[]"); } catch { return []; }
+}
+
+// ─── Label maps (mirror ClientDetailPage) ────────────────────────────────────
+const BUDGET_STANCE_LABELS: Record<string, string> = {
+  perfect_car: "Perfect car matters most",
+  balanced: "Balanced",
+  budget_ceiling: "Budget is the ceiling",
+};
+const PASSENGER_LABELS: Record<string, string> = {
+  just_me: "Just me",
+  "2_adults": "2 adults",
+  "2_adults_1_2": "2 adults + 1\u20132 passengers",
+  "2_adults_3_plus": "2 adults + 3+ passengers",
+};
+const THIRD_ROW_LABELS: Record<string, string> = {
+  daily: "Regular daily use",
+  occasional: "Occasional guests",
+  rarely: "Rarely \u2014 just need the option",
+};
+const SECOND_ROW_LABELS: Record<string, string> = {
+  bench_only: "Bench only",
+  bench_preferred: "Bench preferred",
+  captains_only: "Captain's only",
+  captains_preferred: "Captain's preferred",
+  captains_if_necessary: "Captain's if necessary",
+  no_preference: "No preference",
+};
+const HOME_CHARGING_LABELS: Record<string, string> = {
+  level2: "Dedicated home charger (Level 2)",
+  level1: "Standard outlet only (Level 1)",
+  no_charging: "No home charging \u2014 apartment/condo",
+  na: "N/A",
+};
+const SEAT_TYPE_LABELS: Record<string, string> = {
+  car_seat: "Car Seat",
+  booster: "Booster",
+  neither: "Neither",
+};
+function labelFor(val: string | null | undefined, map: Record<string, string>): string | null {
+  if (!val) return null;
+  return map[val] ?? val;
+}
+function escapeHtml(str: string): string {
+  return str.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 }
 
 function row(label: string, value?: string | null): string {
@@ -87,7 +131,7 @@ function buildEmailHtml(client: Client): string {
     lifestyleHtml = section("Lifestyle & Background")
       + (costco ? row("Costco Membership", costco.charAt(0).toUpperCase() + costco.slice(1)) : "")
       + (veteran ? row("Veteran / Military", veteran === "yes" ? "Yes" : "No") : "")
-      + (household.length > 0 ? row("Household Vehicles", household.map((v: any) => `${v.year || ""} ${v.make || ""}`.trim()).filter(Boolean).join(", ")) : "")
+      + (household.length > 0 ? row("Household Vehicles", household.map((v: any) => [v.year, v.make, v.model, v.trim].filter(Boolean).join(" ")).filter(Boolean).join(", ")) : "")
       + divider();
   }
 
@@ -138,28 +182,57 @@ function buildEmailHtml(client: Client): string {
         ${row("Annual Mileage", client.annualMileage)}
         ${row("Credit Score", client.creditScore)}
         ${row("Timeframe", client.timeframe)}
+        ${row("Budget Stance", labelFor(c.budgetPriorityStance, BUDGET_STANCE_LABELS))}
         ${row("Costco Member", costco ? costco.charAt(0).toUpperCase() + costco.slice(1) : null)}
         ${row("Veteran", veteran === "yes" ? "Yes" : veteran === "no" ? "No" : null)}
         ${divider()}
 
-        ${section("Vehicle Preferences")}
+        ${section("Use & Lifestyle")}
+        ${(() => { const arr = parseJsonArr(c.primaryUseCases); return arr.length > 0 ? row("Primary Uses", arr.join(", ")) : ""; })()}
+        ${row("Special Use Cases", c.specialUseCases)}
+        ${divider()}
+
+        ${section("Body & Size")}
+        ${bodies.length > 0 ? row("Body Styles", bodies.join(", ")) : ""}
+        ${row("Passengers", labelFor(c.passengerRequirement || c.passengerCount, PASSENGER_LABELS))}
+        ${c.childrenInVehicle ? (() => {
+          const kids = parseJsonArr(c.childrenInVehicle);
+          if (kids.length === 0) return "";
+          const list = kids.map((k: any, i: number) => {
+            const age = k.age != null && k.age !== "" ? `Age ${escapeHtml(String(k.age))}` : "Age —";
+            const seat = labelFor(k.seatType, SEAT_TYPE_LABELS) || "—";
+            return `Child ${i + 1}: ${age}, ${escapeHtml(seat)}`;
+          }).join("<br/>");
+          return row("Children in Vehicle", list);
+        })() : ""}
+        ${row("Dog Space", c.dogSpace === "yes" ? "Yes" : c.dogSpace === "no" ? "No" : null)}
+        ${bodies.includes("SUV 3-row") ? (
+          row("3rd Row Usage", labelFor(c.thirdRowUsage, THIRD_ROW_LABELS))
+          + row("2nd Row Pref", labelFor(c.secondRowPreference || c.suvSeatConfig, SECOND_ROW_LABELS))
+        ) : ""}
+        ${divider()}
+
+        ${section("Makes & Models")}
         ${makes.length > 0 ? row("Preferred Makes", makes.join(" · ")) : ""}
         ${notMakes.length > 0 ? row("Not Interested In", notMakes.join(", ")) : ""}
-        ${bodies.length > 0 ? row("Body Styles", bodies.join(", ")) : ""}
         ${row("Models in Mind", client.preferredModels)}
-        ${row("Min. Passengers", c.passengerCount ? String(c.passengerCount) : null)}
+        ${divider()}
+
+        ${section("Powertrain")}
         ${row("Powertrain", c.powertrain?.toUpperCase())}
-        ${c.evLongRange != null ? row("Long-Range EV Need", c.evLongRange === "yes" ? "Yes — drives 200+ mi/day" : "No") : ""}
-        ${row("SUV Seat Config", c.suvSeatConfig)}
-        ${row("Max Seating", c.suvMaxSeating ? String(c.suvMaxSeating) : null)}
-        ${c.suvNumChildren ? row("Children", `${c.suvNumChildren} (ages: ${c.suvChildAges || "not specified"})`) : ""}
-        ${c.suvHasPets != null ? row("Pets", c.suvHasPets === "yes" ? "Yes" : "No") : ""}
+        ${(c.powertrain === "ev" || c.powertrain === "phev") ? row("Home Charging", labelFor(c.homeCharging, HOME_CHARGING_LABELS)) : ""}
+        ${divider()}
+
+        ${(() => { const arr = parseJsonArr(c.safetyTechFeatures); return arr.length > 0 ? section("Safety & Technology") + row("Features", arr.join(", ")) + divider() : ""; })()}
+
+        ${(() => { const arr = parseJsonArr(c.comfortFeatures); return arr.length > 0 ? section("Comfort & Interior") + row("Features", arr.join(", ")) + divider() : ""; })()}
+
+        ${section("Colors")}
         ${row("Exterior Colors", client.exteriorColors)}
         ${intColors.length > 0 ? row("Interior Colors", intColors.join(", ")) : ""}
         ${divider()}
 
-        ${client.mustHaveFeatures ? section("Must-Have Features") + row("Must Have", client.mustHaveFeatures) + divider() : ""}
-        ${client.niceToHaveFeatures ? row("Nice to Have", client.niceToHaveFeatures) + divider() : ""}
+        ${(c.additionalNotes || client.mustHaveFeatures) ? section("Additional Notes") + row("Notes", c.additionalNotes || client.mustHaveFeatures) + divider() : ""}
 
         ${priorityHtml}
 

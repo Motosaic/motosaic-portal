@@ -912,6 +912,52 @@ export default function ClientDetailPage() {
   const householdVehicles: Array<{ year?: string; make?: string; model?: string; trim?: string }> = (() => {
     try { return JSON.parse(client.householdVehicles || "[]"); } catch { return []; }
   })();
+  // New questionnaire fields
+  const primaryUseCases: string[] = parseJson((client as any).primaryUseCases);
+  const safetyTechFeatures: string[] = parseJson((client as any).safetyTechFeatures);
+  const comfortFeatures: string[] = parseJson((client as any).comfortFeatures);
+  const childrenInVehicle: Array<{ age: string; seatType: string }> = (() => {
+    try { return JSON.parse((client as any).childrenInVehicle || "[]"); } catch { return []; }
+  })();
+  const labelFor = (val: string | null | undefined, map: Record<string, string>) =>
+    val ? (map[val] ?? val) : undefined;
+  const BUDGET_STANCE_LABELS: Record<string, string> = {
+    perfect_car: "Perfect car matters most",
+    balanced: "Balanced",
+    budget_ceiling: "Budget is the ceiling",
+  };
+  const PASSENGER_LABELS: Record<string, string> = {
+    just_me: "Just me",
+    "2_adults": "2 adults",
+    "2_adults_1_2": "2 adults + 1–2 passengers",
+    "2_adults_3_plus": "2 adults + 3+ passengers",
+  };
+  const THIRD_ROW_LABELS: Record<string, string> = {
+    daily: "Regular daily use",
+    occasional: "Occasional guests",
+    rarely: "Rarely — just need the option",
+  };
+  const SECOND_ROW_LABELS: Record<string, string> = {
+    bench_only: "Bench only",
+    bench_preferred: "Bench preferred",
+    captains_only: "Captain's only",
+    captains_preferred: "Captain's preferred",
+    captains_if_necessary: "Captain's if necessary",
+    no_preference: "No preference",
+  };
+  const HOME_CHARGING_LABELS: Record<string, string> = {
+    level2: "Dedicated home charger (Level 2)",
+    level1: "Standard outlet only (Level 1)",
+    no_charging: "No home charging — apartment/condo",
+    na: "N/A",
+  };
+  const SEAT_TYPE_LABELS: Record<string, string> = {
+    car_seat: "Car Seat",
+    booster: "Booster",
+    neither: "Neither",
+  };
+  const hasSUV3RowSelected = bodyStyles.includes("SUV 3-row");
+  const isEVorPHEV = client.powertrain === "ev" || client.powertrain === "phev";
   const priorityRankings: Record<string, string | number> = (() => {
     try { return JSON.parse(client.priorityRankings || "{}"); } catch { return {}; }
   })();
@@ -1175,6 +1221,8 @@ export default function ClientDetailPage() {
                     <Row label="Monthly"   value={client.monthlyPayment} />
                     <Row label="Credit"    value={client.creditScore} />
                     <Row label="Timeframe" value={client.timeframe} />
+                    <Row label="Annual Miles" value={client.annualMileage} />
+                    <Row label="Budget Stance" value={labelFor((client as any).budgetPriorityStance, BUDGET_STANCE_LABELS)} />
                   </div>
                 </div>
               </SectionCard>
@@ -1236,14 +1284,20 @@ export default function ClientDetailPage() {
                 </svg>
               }>
                 <div className="flex flex-col gap-3">
-                  {preferredMakes.length > 0 && (
+                  {/* Use & Lifestyle */}
+                  {primaryUseCases.length > 0 && (
                     <div>
-                      <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.78)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Makes</p>
+                      <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.78)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Primary Use Cases</p>
                       <div className="flex flex-wrap gap-1.5">
-                        {preferredMakes.map((m: string) => <Pill key={m} label={m} />)}
+                        {primaryUseCases.map((u: string) => <Pill key={u} label={u} />)}
                       </div>
                     </div>
                   )}
+                  {(client as any).specialUseCases && (
+                    <Row label="Special Use Cases" value={(client as any).specialUseCases} />
+                  )}
+
+                  {/* Body & Size */}
                   {bodyStyles.length > 0 && (
                     <div>
                       <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.78)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Body Style</p>
@@ -1252,20 +1306,39 @@ export default function ClientDetailPage() {
                       </div>
                     </div>
                   )}
-                  {client.exteriorColors && (
-                    <Row label="Ext Color" value={client.exteriorColors} />
+                  <Row label="Passengers" value={labelFor((client as any).passengerRequirement || client.passengerCount, PASSENGER_LABELS)} />
+                  {(client as any).dogSpace && (
+                    <Row label="Dog Space" value={(client as any).dogSpace === "yes" ? "Yes" : "No"} />
                   )}
-                  {intColors.length > 0 && (
-                    <Row label="Int Color" value={intColors.join(", ")} />
+                  {childrenInVehicle.length > 0 && (
+                    <div>
+                      <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.78)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Children in Vehicle</p>
+                      <div className="flex flex-col gap-1">
+                        {childrenInVehicle.map((c, i) => (
+                          <div key={i} className="flex gap-3 px-2.5 py-1.5 rounded-lg text-xs"
+                            style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.85)" }}>
+                            <span style={{ fontWeight: 700, minWidth: 60 }}>Age {c.age || "—"}</span>
+                            <span>{labelFor(c.seatType, SEAT_TYPE_LABELS) || "—"}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
-                  {client.mustHaveFeatures && (
-                    <Row label="Must-Have" value={client.mustHaveFeatures} />
+                  {hasSUV3RowSelected && (
+                    <>
+                      <Row label="3rd Row Usage" value={labelFor((client as any).thirdRowUsage, THIRD_ROW_LABELS)} />
+                      <Row label="2nd Row Pref" value={labelFor((client as any).secondRowPreference || client.suvSeatConfig, SECOND_ROW_LABELS)} />
+                    </>
                   )}
-                  {client.niceToHaveFeatures && (
-                    <Row label="Nice-to-Have" value={client.niceToHaveFeatures} />
-                  )}
-                  {client.preferredModels && (
-                    <Row label="Models" value={client.preferredModels} />
+
+                  {/* Makes & Models */}
+                  {preferredMakes.length > 0 && (
+                    <div>
+                      <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.78)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Preferred Makes</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {preferredMakes.map((m: string) => <Pill key={m} label={m} />)}
+                      </div>
+                    </div>
                   )}
                   {notInterestedMakes.length > 0 && (
                     <div>
@@ -1280,18 +1353,47 @@ export default function ClientDetailPage() {
                       </div>
                     </div>
                   )}
+                  {client.preferredModels && (
+                    <Row label="Models" value={client.preferredModels} />
+                  )}
+
+                  {/* Powertrain */}
                   <Row label="Powertrain" value={client.powertrain} />
-                  {client.powertrain?.toLowerCase().includes("ev") || client.powertrain?.toLowerCase().includes("electric") ? (
-                    <Row label="EV Long Range" value={client.evLongRange ? "Yes" : "No"} />
-                  ) : null}
-                  <Row label="Annual Miles" value={client.annualMileage} />
-                  <Row label="Passengers" value={client.passengerCount} />
-                  {client.suvSeatConfig && <Row label="SUV Seats" value={client.suvSeatConfig} />}
-                  {client.suvMaxSeating && <Row label="Max Seating" value={client.suvMaxSeating} />}
-                  {client.suvNumChildren && <Row label="# Children" value={String(client.suvNumChildren)} />}
-                  {client.suvChildAges && <Row label="Child Ages" value={client.suvChildAges} />}
-                  {client.suvHasPets !== undefined && client.suvHasPets !== null && (
-                    <Row label="Has Pets" value={client.suvHasPets ? "Yes" : "No"} />
+                  {isEVorPHEV && (
+                    <Row label="Home Charging" value={labelFor((client as any).homeCharging, HOME_CHARGING_LABELS)} />
+                  )}
+
+                  {/* Safety & Tech */}
+                  {safetyTechFeatures.length > 0 && (
+                    <div>
+                      <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.78)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Safety & Tech</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {safetyTechFeatures.map((s: string) => <Pill key={s} label={s} />)}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Comfort */}
+                  {comfortFeatures.length > 0 && (
+                    <div>
+                      <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.78)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Comfort</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {comfortFeatures.map((s: string) => <Pill key={s} label={s} />)}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Colors */}
+                  {client.exteriorColors && (
+                    <Row label="Ext Color" value={client.exteriorColors} />
+                  )}
+                  {intColors.length > 0 && (
+                    <Row label="Int Color" value={intColors.join(", ")} />
+                  )}
+
+                  {/* Additional notes */}
+                  {((client as any).additionalNotes || client.mustHaveFeatures) && (
+                    <Row label="Additional Notes" value={(client as any).additionalNotes || client.mustHaveFeatures} />
                   )}
                 </div>
               </SectionCard>

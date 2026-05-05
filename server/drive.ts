@@ -193,31 +193,137 @@ export async function generateQuestionnairePDF(client: Client): Promise<Buffer> 
     if (client.annualMileage) row("Annual Mileage", client.annualMileage);
     if (client.creditScore) row("Credit Score", client.creditScore);
     row("Timeframe", client.timeframe, true);
+    // Label maps for new questionnaire fields
+    const BUDGET_STANCE_LABELS: Record<string, string> = {
+      perfect_car: "Perfect car matters most",
+      balanced: "Balanced",
+      budget_ceiling: "Budget is the ceiling",
+    };
+    const PASSENGER_LABELS: Record<string, string> = {
+      just_me: "Just me",
+      "2_adults": "2 adults",
+      "2_adults_1_2": "2 adults + 1\u20132 passengers",
+      "2_adults_3_plus": "2 adults + 3+ passengers",
+    };
+    const THIRD_ROW_LABELS: Record<string, string> = {
+      daily: "Regular daily use",
+      occasional: "Occasional guests",
+      rarely: "Rarely \u2014 just need the option",
+    };
+    const SECOND_ROW_LABELS: Record<string, string> = {
+      bench_only: "Bench only",
+      bench_preferred: "Bench preferred",
+      captains_only: "Captain's only",
+      captains_preferred: "Captain's preferred",
+      captains_if_necessary: "Captain's if necessary",
+      no_preference: "No preference",
+    };
+    const HOME_CHARGING_LABELS: Record<string, string> = {
+      level2: "Dedicated home charger (Level 2)",
+      level1: "Standard outlet only (Level 1)",
+      no_charging: "No home charging \u2014 apartment/condo",
+      na: "N/A",
+    };
+    const SEAT_TYPE_LABELS: Record<string, string> = {
+      car_seat: "Car Seat",
+      booster: "Booster",
+      neither: "Neither",
+    };
+    const labelFor = (val: any, map: Record<string, string>): string | null =>
+      val ? (map[val] ?? String(val)) : null;
+    const c: any = client;
+    if (c.budgetPriorityStance) row("Budget Stance", labelFor(c.budgetPriorityStance, BUDGET_STANCE_LABELS));
     divider();
 
-    // ── 3. Vehicle Preferences
-    section("Vehicle Preferences");
-    const makes = parseJson(client.preferredMakes);
-    if (makes.length > 0) row("Preferred Makes", makes.join(" · "), true);
-    const notMakes = parseJson((client as any).notInterestedMakes);
-    if (notMakes.length > 0) row("Not Interested In", notMakes.join(", "));
+    // ── 3. Use & Lifestyle
+    const primaryUses = parseJson(c.primaryUseCases);
+    if (primaryUses.length > 0 || c.specialUseCases) {
+      section("Use & Lifestyle");
+      if (primaryUses.length > 0) row("Primary Uses", primaryUses.join(", "), true);
+      if (c.specialUseCases) row("Special Use Cases", c.specialUseCases);
+      divider();
+    }
+
+    // ── 4. Body & Size
     const bodies = parseJson(client.bodyStyles);
-    if (bodies.length > 0) row("Body Style", bodies.join(", "));
-    if (client.preferredModels) row("Models in Mind", client.preferredModels);
-    if ((client as any).passengerCount) row("Min. Passengers", String((client as any).passengerCount));
-    if ((client as any).powertrain) row("Powertrain", (client as any).powertrain?.toUpperCase());
-    if ((client as any).evLongRange != null) row("Long-Range EV", (client as any).evLongRange ? "Yes — drives 200+ mi/day" : "No");
-    // SUV-specific details
-    if ((client as any).suvSeatConfig) row("SUV Seat Config", (client as any).suvSeatConfig);
-    if ((client as any).suvMaxSeating) row("Max Seating", String((client as any).suvMaxSeating));
-    if ((client as any).suvNumChildren) row("Children", `${(client as any).suvNumChildren} (ages: ${(client as any).suvChildAges || "not specified"})`);
-    if ((client as any).suvHasPets != null) row("Pets", (client as any).suvHasPets ? "Yes" : "No");
-    if (client.exteriorColors) row("Exterior Colors", client.exteriorColors);
-    const intColors = parseJson(client.interiorColors);
-    if (intColors.length > 0) row("Interior Colors", intColors.join(", "));
-    if (client.mustHaveFeatures) row("Must-Have Features", client.mustHaveFeatures, true);
-    if (client.niceToHaveFeatures) row("Nice-to-Have", client.niceToHaveFeatures);
+    section("Body & Size");
+    if (bodies.length > 0) row("Body Style", bodies.join(", "), true);
+    const passengerVal = c.passengerRequirement || c.passengerCount;
+    if (passengerVal) row("Passengers", labelFor(passengerVal, PASSENGER_LABELS));
+    // Children in vehicle
+    if (c.childrenInVehicle) {
+      try {
+        const kids = JSON.parse(c.childrenInVehicle || "[]");
+        if (Array.isArray(kids) && kids.length > 0) {
+          kids.forEach((k: any, i: number) => {
+            const age = k.age != null && k.age !== "" ? `Age ${k.age}` : "Age \u2014";
+            const seat = labelFor(k.seatType, SEAT_TYPE_LABELS) || "\u2014";
+            row(`Child ${i + 1}`, `${age}, ${seat}`);
+          });
+        }
+      } catch { /* skip */ }
+    }
+    if (c.dogSpace) row("Dog Space", c.dogSpace === "yes" ? "Yes" : "No");
+    if (bodies.includes("SUV 3-row")) {
+      if (c.thirdRowUsage) row("3rd Row Usage", labelFor(c.thirdRowUsage, THIRD_ROW_LABELS));
+      const secondRow = c.secondRowPreference || c.suvSeatConfig;
+      if (secondRow) row("2nd Row Pref", labelFor(secondRow, SECOND_ROW_LABELS));
+    }
     divider();
+
+    // ── 5. Makes & Models
+    const makes = parseJson(client.preferredMakes);
+    const notMakes = parseJson(c.notInterestedMakes);
+    if (makes.length > 0 || notMakes.length > 0 || client.preferredModels) {
+      section("Makes & Models");
+      if (makes.length > 0) row("Preferred Makes", makes.join(" · "), true);
+      if (notMakes.length > 0) row("Not Interested In", notMakes.join(", "));
+      if (client.preferredModels) row("Models in Mind", client.preferredModels);
+      divider();
+    }
+
+    // ── 6. Powertrain
+    if (c.powertrain) {
+      section("Powertrain");
+      row("Powertrain", c.powertrain?.toUpperCase(), true);
+      if ((c.powertrain === "ev" || c.powertrain === "phev") && c.homeCharging) {
+        row("Home Charging", labelFor(c.homeCharging, HOME_CHARGING_LABELS));
+      }
+      divider();
+    }
+
+    // ── 7. Safety & Technology
+    const safetyTech = parseJson(c.safetyTechFeatures);
+    if (safetyTech.length > 0) {
+      section("Safety & Technology");
+      row("Features", safetyTech.join(", "));
+      divider();
+    }
+
+    // ── 8. Comfort & Interior
+    const comfort = parseJson(c.comfortFeatures);
+    if (comfort.length > 0) {
+      section("Comfort & Interior");
+      row("Features", comfort.join(", "));
+      divider();
+    }
+
+    // ── 9. Colors
+    const intColors = parseJson(client.interiorColors);
+    if (client.exteriorColors || intColors.length > 0) {
+      section("Colors");
+      if (client.exteriorColors) row("Exterior Colors", client.exteriorColors);
+      if (intColors.length > 0) row("Interior Colors", intColors.join(", "));
+      divider();
+    }
+
+    // ── 10. Additional Notes
+    const notes = c.additionalNotes || client.mustHaveFeatures;
+    if (notes) {
+      section("Additional Notes");
+      row("Notes", notes);
+      divider();
+    }
 
     // ── 4. Priority Rankings
     const rawRankings = (client as any).priorityRankings;
@@ -237,7 +343,7 @@ export async function generateQuestionnairePDF(client: Client): Promise<Buffer> 
       } catch { /* skip if malformed */ }
     }
 
-    // ── 5. Lifestyle & Background
+    // ── 11. Lifestyle & Background
     const costco    = (client as any).costcoMembership;
     const veteran   = (client as any).isVeteran;
     const household = parseJson((client as any).householdVehicles);
@@ -245,7 +351,12 @@ export async function generateQuestionnairePDF(client: Client): Promise<Buffer> 
       section("Lifestyle & Background");
       if (costco)              row("Costco Membership", costco.charAt(0).toUpperCase() + costco.slice(1));
       if (veteran)             row("Veteran / Military", veteran === "yes" ? "Yes" : "No");
-      if (household.length > 0) row("Household Vehicles", household.join(", "));
+      if (household.length > 0) {
+        const hhText = household.map((v: any) =>
+          typeof v === "string" ? v : [v.year, v.make, v.model, v.trim].filter(Boolean).join(" ")
+        ).filter(Boolean).join(", ");
+        if (hhText) row("Household Vehicles", hhText);
+      }
       divider();
     }
 

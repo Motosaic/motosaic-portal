@@ -43,6 +43,19 @@ export const clients = sqliteTable("clients", {
   householdVehicles: text("household_vehicles"),     // JSON array of {year, make}
   powertrain: text("powertrain"),                    // "ev" | "phev" | "gas" | "indifferent"
   evLongRange: text("ev_long_range"),                // "yes" | "no"
+  // New Questionnaire Fields (batch 3 — 2025 overhaul)
+  budgetPriorityStance: text("budget_priority_stance"), // "perfect_car" | "balanced" | "budget_ceiling"
+  primaryUseCases: text("primary_use_cases"),         // JSON array of selected use case strings
+  specialUseCases: text("special_use_cases"),         // free text
+  passengerRequirement: text("passenger_requirement"), // "just_me" | "2_adults" | "2_adults_1_2" | "2_adults_3_plus"
+  childrenInVehicle: text("children_in_vehicle"),     // JSON array of {age, seatType}
+  dogSpace: text("dog_space"),                        // "yes" | "no"
+  thirdRowUsage: text("third_row_usage"),             // "daily" | "occasional" | "rarely"
+  secondRowPreference: text("second_row_preference"), // "bench_only" | "bench_preferred" | "captains_only" | "captains_preferred" | "captains_if_necessary" | "no_preference"
+  homeCharging: text("home_charging"),                // "level2" | "level1" | "no_charging" | "na"
+  safetyTechFeatures: text("safety_tech_features"),   // JSON array of selected safety chip strings
+  comfortFeatures: text("comfort_features"),          // JSON array of selected comfort chip strings
+  additionalNotes: text("additional_notes"),          // catch-all free text (replaces mustHaveFeatures usage)
   // Priority Rankings — JSON: { category: string, rank: 1|2|3|4|5|"na" }[]
   priorityRankings: text("priority_rankings"),
   // Trade-In
