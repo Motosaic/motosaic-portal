@@ -848,7 +848,7 @@ export default function ClientDetailPage() {
   const qc = useQueryClient();
   const [notes, setNotes] = useState("");
   const [editingNotes, setEditingNotes] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "questionnaire" | "documents" | "deal" | "intelligence">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "documents" | "deal" | "intelligence">("overview");
   const [chatOpen, setChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [chatHistory, setChatHistory] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
@@ -1064,9 +1064,8 @@ export default function ClientDetailPage() {
         {/* ── Main tab bar ── */}
         <div className="px-4 md:px-8 pt-4 flex gap-1 overflow-x-auto" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
           {([
-            { key: "overview",      label: "Overview" },
-            { key: "questionnaire", label: "Questionnaire" },
-            { key: "documents",     label: "Documents" },
+            { key: "overview",  label: "Overview" },
+            { key: "documents", label: "Documents" },
             { key: "deal",          label: "Deal Build" },
             { key: "intelligence",  label: "Intelligence" },
           ] as const).map(tab => (
@@ -1542,68 +1541,6 @@ export default function ClientDetailPage() {
           </SectionCard>
 
           </>)}
-
-          {/* ── QUESTIONNAIRE TAB ── */}
-          {activeTab === "questionnaire" && (
-            <SectionCard title="Client Questionnaire" icon={
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-              </svg>
-            }>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-                <div>
-                  <Row label="Name"      value={`${client.firstName} ${client.lastName}`} />
-                  <Row label="Purchase"  value={client.purchaseType} />
-                  <Row label="Budget"    value={client.budget} />
-                  <Row label="Down Pmt"  value={client.downPayment} />
-                  <Row label="Monthly"   value={client.monthlyPayment} />
-                  <Row label="Credit"    value={client.creditScore} />
-                  <Row label="Timeframe" value={client.timeframe} />
-                </div>
-                <div>
-                  {preferredMakes.length > 0 && (
-                    <div className="mb-3">
-                      <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.78)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Preferred Makes</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {preferredMakes.map((m: string) => <Pill key={m} label={m} />)}
-                      </div>
-                    </div>
-                  )}
-                  {bodyStyles.length > 0 && (
-                    <div className="mb-3">
-                      <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.78)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Body Styles</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {bodyStyles.map((s: string) => <Pill key={s} label={s} />)}
-                      </div>
-                    </div>
-                  )}
-                  <Row label="Must-Have"     value={client.mustHaveFeatures} />
-                  <Row label="Nice-to-Have"  value={client.niceToHaveFeatures} />
-                  <Row label="Annual Miles"  value={client.annualMileage} />
-                  <Row label="Powertrain"    value={client.powertrain} />
-                  <Row label="Trade-In"      value={client.hasTradeIn ? "Yes" : "No"} />
-                </div>
-              </div>
-              {client.hasTradeIn && (
-                <div className="mt-4 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
-                  <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.78)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>Trade-In Vehicle</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-                    <div>
-                      <Row label="Year"      value={client.tradeYear} />
-                      <Row label="Make"      value={client.tradeMake} />
-                      <Row label="Model"     value={client.tradeModel} />
-                      <Row label="Trim"      value={client.tradeTrim} />
-                    </div>
-                    <div>
-                      <Row label="Mileage"   value={client.tradeMileage} />
-                      <Row label="Condition" value={client.tradeCondition} />
-                      <Row label="Owed"      value={client.tradeOwed} />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </SectionCard>
-          )}
 
           {/* ── DOCUMENTS TAB ── */}
           {activeTab === "documents" && (
