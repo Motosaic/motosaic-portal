@@ -281,12 +281,12 @@ type FormData = {
   suvChildAges: string;
   suvHasPets: string;
   // Powertrain
-  powertrain: string;        // "gas" | "hybrid" | "phev" | "ev" | "indifferent"
+  powertrain: string[];      // multi-select: "gas" | "hybrid" | "phev" | "ev" | "indifferent"
   evLongRange: string;
   homeCharging: string;      // "level2" | "level1" | "no_charging" | "na"
-  // Safety / Comfort chip lists
-  safetyTechFeatures: string[];
-  comfortFeatures: string[];
+  // Safety / Comfort chip lists — tri-state: 0=unset, 1=nice-to-have, 2=must-have
+  safetyTechFeatures: Record<string, 0|1|2>;
+  comfortFeatures: Record<string, 0|1|2>;
   // Catch-all
   additionalNotes: string;
   // Step 4
@@ -314,10 +314,10 @@ const initial: FormData = {
   preferredModels: "",
   exteriorColors: [], interiorColors: [],
   passengerCount: "", suvSeatConfig: "", suvMaxSeating: "", suvNumChildren: "", suvChildAges: "", suvHasPets: "",
-  powertrain: "", evLongRange: "",
+  powertrain: [], evLongRange: "",
   homeCharging: "",
-  safetyTechFeatures: [],
-  comfortFeatures: [],
+  safetyTechFeatures: {},
+  comfortFeatures: {},
   additionalNotes: "",
   hasTradeIn: false, tradeYear: "", tradeMake: "", tradeModel: "", tradeTrim: "",
   tradeMileage: "", tradeCondition: "", tradeOwed: "",
@@ -392,10 +392,8 @@ const CREDIT_RANGES = [
 ];
 
 const TIMEFRAMES = [
-  "ASAP",
   "0–3 months",
   "3–6 months",
-  "6–12 months",
   "Just exploring",
 ];
 
@@ -467,6 +465,73 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
         {hint && <span style={{ fontWeight: 400, color: "rgba(255,255,255,0.82)", fontSize: 11, marginLeft: 6 }}>({hint})</span>}
       </label>
       {children}
+    </div>
+  );
+}
+
+// Tri-state chip list: 0=unset, 1=nice-to-have (Miami Blue), 2=must-have (Gelbgrün)
+// Includes a real-time live summary panel below the chips
+function TriStateFeatureList({
+  chips, state, onChange,
+}: {
+  chips: string[];
+  state: Record<string, 0|1|2>;
+  onChange: (s: Record<string, 0|1|2>) => void;
+}) {
+  const cycle = (chip: string) => {
+    const cur = state[chip] ?? 0;
+    const next: 0|1|2 = cur === 0 ? 1 : cur === 1 ? 2 : 0;
+    onChange({ ...state, [chip]: next });
+  };
+  const mustHave   = chips.filter(c => state[c] === 2);
+  const niceToHave = chips.filter(c => state[c] === 1);
+  const anySelected = mustHave.length > 0 || niceToHave.length > 0;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap gap-2">
+        {chips.map(chip => {
+          const s = state[chip] ?? 0;
+          return (
+            <button key={chip} type="button" onClick={() => cycle(chip)}
+              className="px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150"
+              style={{
+                background: s === 2 ? "rgba(173,240,41,0.15)" : s === 1 ? "rgba(31,195,239,0.15)" : "rgba(255,255,255,0.07)",
+                color: s === 2 ? "#ADF029" : s === 1 ? "#1FC3EF" : "rgba(255,255,255,0.65)",
+                border: `1.5px solid ${s === 2 ? "#ADF029" : s === 1 ? "#1FC3EF" : "rgba(255,255,255,0.1)"}`,
+                fontFamily: "Industry, sans-serif",
+                minHeight: 40,
+              }}>
+              {chip}
+            </button>
+          );
+        })}
+      </div>
+      {/* Live summary */}
+      {anySelected && (
+        <div className="rounded-xl p-3 flex flex-col gap-2" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          {mustHave.length > 0 && (
+            <div>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "#ADF029", letterSpacing: "0.08em", textTransform: "uppercase" }}>Must Have</span>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {mustHave.map(c => (
+                  <span key={c} className="px-2 py-0.5 rounded text-xs" style={{ background: "rgba(173,240,41,0.12)", color: "#ADF029", border: "1px solid rgba(173,240,41,0.3)" }}>{c}</span>
+                ))}
+              </div>
+            </div>
+          )}
+          {niceToHave.length > 0 && (
+            <div>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "#1FC3EF", letterSpacing: "0.08em", textTransform: "uppercase" }}>Nice to Have</span>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {niceToHave.map(c => (
+                  <span key={c} className="px-2 py-0.5 rounded text-xs" style={{ background: "rgba(31,195,239,0.10)", color: "#1FC3EF", border: "1px solid rgba(31,195,239,0.25)" }}>{c}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -781,24 +846,109 @@ export default function IntakePage() {
   // Pre-populate form from existing client record when first loaded
   const [namePrefilled, setNamePrefilled] = useState(false);
   if (existingClient && !namePrefilled) {
-    if (existingClient.firstName || existingClient.lastName) {
-      setForm(prev => ({
-        ...prev,
-        firstName: prev.firstName || existingClient.firstName || "",
-        lastName: prev.lastName || existingClient.lastName || "",
-        priorityRankings: Object.keys(prev.priorityRankings).length === 0
-          ? (() => {
-              try { return JSON.parse((existingClient as any).priorityRankings || "{}"); }
-              catch { return {}; }
-            })()
-          : prev.priorityRankings,
-      }));
+    const ec = existingClient as any;
+    const tryParse = (v: string | null | undefined, fallback: unknown) => {
+      try { return JSON.parse(v || ""); } catch { return fallback; }
+    };
+    setForm(prev => ({
+      ...prev,
+      firstName: prev.firstName || ec.firstName || "",
+      lastName: prev.lastName || ec.lastName || "",
+      address: prev.address || ec.address || "",
+      city: prev.city || ec.city || "",
+      state: prev.state || ec.state || "",
+      zip: prev.zip || ec.zip || "",
+      // Step 2
+      purchaseType: prev.purchaseType || ec.purchaseType || "",
+      budget: prev.budget || ec.budget || "",
+      downPayment: prev.downPayment || ec.downPayment || "",
+      monthlyPayment: prev.monthlyPayment || ec.monthlyPayment || "",
+      creditScore: prev.creditScore || ec.creditScore || "",
+      timeframe: prev.timeframe || ec.timeframe || "",
+      annualMileage: prev.annualMileage || ec.annualMileage || "",
+      budgetPriorityStance: prev.budgetPriorityStance || ec.budgetPriorityStance || "",
+      // Step 3
+      primaryUseCases: prev.primaryUseCases.length > 0 ? prev.primaryUseCases : tryParse(ec.primaryUseCases, []),
+      specialUseCases: prev.specialUseCases || ec.specialUseCases || "",
+      bodyStyles: prev.bodyStyles.length > 0 ? prev.bodyStyles : tryParse(ec.bodyStyles, []),
+      passengerRequirement: prev.passengerRequirement || ec.passengerRequirement || ec.passengerCount || "",
+      childrenRiding: prev.childrenRiding || (ec.childrenInVehicle && ec.childrenInVehicle !== "[]" ? "yes" : ""),
+      childrenInVehicle: prev.childrenInVehicle.length > 0 ? prev.childrenInVehicle : tryParse(ec.childrenInVehicle, []),
+      dogSpace: prev.dogSpace || ec.dogSpace || "",
+      thirdRowUsage: prev.thirdRowUsage || ec.thirdRowUsage || "",
+      secondRowPreference: prev.secondRowPreference || ec.secondRowPreference || ec.suvSeatConfig || "",
+      powertrain: prev.powertrain.length > 0 ? prev.powertrain : tryParse(ec.powertrain, ec.powertrain ? [ec.powertrain] : []),
+      homeCharging: prev.homeCharging || ec.homeCharging || "",
+      safetyTechFeatures: Object.keys(prev.safetyTechFeatures).length > 0 ? prev.safetyTechFeatures : (() => {
+        const p = tryParse(ec.safetyTechFeatures, {});
+        if (p.mustHave || p.niceToHave) {
+          const r: Record<string, 0|1|2> = {};
+          (p.mustHave || []).forEach((k: string) => { r[k] = 2; });
+          (p.niceToHave || []).forEach((k: string) => { r[k] = 1; });
+          return r;
+        }
+        return {};
+      })(),
+      comfortFeatures: Object.keys(prev.comfortFeatures).length > 0 ? prev.comfortFeatures : (() => {
+        const p = tryParse(ec.comfortFeatures, {});
+        if (p.mustHave || p.niceToHave) {
+          const r: Record<string, 0|1|2> = {};
+          (p.mustHave || []).forEach((k: string) => { r[k] = 2; });
+          (p.niceToHave || []).forEach((k: string) => { r[k] = 1; });
+          return r;
+        }
+        return {};
+      })(),
+      exteriorColors: prev.exteriorColors.length > 0 ? prev.exteriorColors : tryParse(ec.exteriorColors, []),
+      interiorColors: prev.interiorColors.length > 0 ? prev.interiorColors : tryParse(ec.interiorColors, []),
+      additionalNotes: prev.additionalNotes || ec.additionalNotes || ec.mustHaveFeatures || "",
+      costcoMembership: prev.costcoMembership || ec.costcoMembership || "",
+      isVeteran: prev.isVeteran || ec.isVeteran || "",
+      householdVehicles: prev.householdVehicles.length > 0 ? prev.householdVehicles : tryParse(ec.householdVehicles, []),
+      // Step 4 trade-in
+      hasTradeIn: prev.hasTradeIn || ec.hasTradeIn || "",
+      tradeYear: prev.tradeYear || ec.tradeYear || "",
+      tradeMake: prev.tradeMake || ec.tradeMake || "",
+      tradeModel: prev.tradeModel || ec.tradeModel || "",
+      tradeTrim: prev.tradeTrim || ec.tradeTrim || "",
+      tradeMileage: prev.tradeMileage || ec.tradeMileage || "",
+      tradeCondition: prev.tradeCondition || ec.tradeCondition || "",
+      tradeOwed: prev.tradeOwed || ec.tradeOwed || "",
+      // Step 5 priorities
+      priorityRankings: Object.keys(prev.priorityRankings).length === 0
+        ? tryParse(ec.priorityRankings, {})
+        : prev.priorityRankings,
+    }));
+    // Restore makes state
+    if (ec.preferredMakes || ec.notInterestedMakes) {
+      const pref: string[] = tryParse(ec.preferredMakes, []);
+      const notInt: string[] = tryParse(ec.notInterestedMakes, []);
+      const ms: MakeState = {};
+      pref.forEach((m: string) => { ms[m] = 1; });
+      notInt.forEach((m: string) => { ms[m] = -1; });
+      setMakesState(ms);
     }
     setNamePrefilled(true);
   }
 
-  const set = (field: keyof FormData, value: unknown) =>
-    setForm(prev => ({ ...prev, [field]: value }));
+  // Real-time autosave — debounced 1.5s after any chip/toggle change
+  const [saveTimer, setSaveTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const triggerAutosave = (data: FormData) => {
+    if (!clientId) return;
+    if (saveTimer) clearTimeout(saveTimer);
+    const t = setTimeout(() => {
+      apiRequest("PATCH", `/api/clients/${clientId}/questionnaire`, buildPayload(data)).catch(() => {});
+    }, 1500);
+    setSaveTimer(t);
+  };
+
+  const set = (field: keyof FormData, value: unknown) => {
+    setForm(prev => {
+      const next = { ...prev, [field]: value };
+      triggerAutosave(next);
+      return next;
+    });
+  };
 
   // Derive preferred/not-interested from tri-state
   const preferredMakes = Object.entries(makesState).filter(([,v]) => v === 1).map(([k]) => k);
@@ -827,8 +977,16 @@ export default function IntakePage() {
       // Clear out the legacy nice-to-have field
       niceToHaveFeatures: "",
       // New chip lists
-      safetyTechFeatures: JSON.stringify(data.safetyTechFeatures),
-      comfortFeatures: JSON.stringify(data.comfortFeatures),
+      powertrain: JSON.stringify(data.powertrain),
+      // Serialize tri-state maps — store as {mustHave:[...], niceToHave:[...]} for Drive/email
+      safetyTechFeatures: JSON.stringify({
+        mustHave: Object.entries(data.safetyTechFeatures).filter(([,v]) => v === 2).map(([k]) => k),
+        niceToHave: Object.entries(data.safetyTechFeatures).filter(([,v]) => v === 1).map(([k]) => k),
+      }),
+      comfortFeatures: JSON.stringify({
+        mustHave: Object.entries(data.comfortFeatures).filter(([,v]) => v === 2).map(([k]) => k),
+        niceToHave: Object.entries(data.comfortFeatures).filter(([,v]) => v === 1).map(([k]) => k),
+      }),
       // New scalar fields
       budgetPriorityStance: data.budgetPriorityStance,
       primaryUseCases: JSON.stringify(data.primaryUseCases),
@@ -886,7 +1044,7 @@ export default function IntakePage() {
       if (form.primaryUseCases.length === 0) return false;
       if (form.bodyStyles.length === 0) return false;
       if (!form.passengerRequirement) return false;
-      if (!form.powertrain) return false;
+      if (form.powertrain.length === 0) return false;
       if (isEVorPHEV && !form.homeCharging) return false;
       return true;
     }
@@ -964,7 +1122,7 @@ export default function IntakePage() {
   // Whether passenger requirement implies passengers besides the 2 adults
   const passengersInclude = form.passengerRequirement === "2_adults_1_2" || form.passengerRequirement === "2_adults_3_plus";
   const hasSUV3Row = form.bodyStyles.includes("SUV 3-row");
-  const isEVorPHEV = form.powertrain === "ev" || form.powertrain === "phev";
+  const isEVorPHEV = form.powertrain.includes("ev") || form.powertrain.includes("phev");
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(160deg, #002639 0%, #004363 60%, #003552 100%)" }}>
@@ -1342,7 +1500,6 @@ export default function IntakePage() {
                           ["bench_preferred", "Bench preferred"],
                           ["captains_only", "Captain's only"],
                           ["captains_preferred", "Captain's preferred"],
-                          ["captains_if_necessary", "Captain's if necessary"],
                           ["no_preference", "No preference"],
                         ] as [string, string][]).map(([v, l]) => (
                           <button key={v} type="button" onClick={() => set("secondRowPreference", v)}
@@ -1373,7 +1530,10 @@ export default function IntakePage() {
                     Tap once for ✓ preferred (green) · tap again for ✕ not interested (red) · tap again to clear.
                     You don't have to weigh in on every brand — just the ones that matter to you.
                   </p>
-                  <TriStateMakes makes={MAKES} state={makesState} onChange={setMakesState} />
+                  <TriStateMakes makes={MAKES} state={makesState} onChange={(ms) => {
+                    setMakesState(ms);
+                    triggerAutosave(form);
+                  }} />
                 </div>
                 <Field label="Specific Models of Interest">
                   <input className="intake-input" placeholder="e.g. RAV4, F-150, 3 Series..." value={form.preferredModels}
@@ -1382,30 +1542,40 @@ export default function IntakePage() {
 
                 {/* POWERTRAIN */}
                 <SectionDivider label="Powertrain" />
-                <Field label="Powertrain *">
-                  <div className="flex flex-col gap-2 mt-1">
+                <Field label="Powertrain *" hint="select all that apply">
+                  <div className="flex flex-wrap gap-2 mt-1">
                     {([
                       ["gas", "Gasoline"],
                       ["hybrid", "Hybrid (no plug)"],
                       ["phev", "PHEV"],
                       ["ev", "Fully Electric"],
                       ["indifferent", "Open to guidance"],
-                    ] as [string, string][]).map(([v, l]) => (
-                      <button key={v} type="button" onClick={() => set("powertrain", v)}
-                        className="rounded-xl font-bold transition-all text-left"
-                        style={{
-                          background: form.powertrain === v ? "var(--miami-blue)" : "rgba(255,255,255,0.07)",
-                          color: form.powertrain === v ? "var(--shelby-blue)" : "rgba(255,255,255,0.85)",
-                          border: `1px solid ${form.powertrain === v ? "var(--miami-blue)" : "rgba(255,255,255,0.1)"}`,
-                          fontFamily: "Industry, sans-serif",
-                          fontSize: 13,
-                          minHeight: 44,
-                          padding: "10px 14px",
-                        }}
-                        data-testid={`btn-powertrain-${v}`}>
-                        {l}
-                      </button>
-                    ))}
+                    ] as [string, string][]).map(([v, l]) => {
+                      const sel = form.powertrain.includes(v);
+                      const togglePt = () => {
+                        if (v === "indifferent") {
+                          // indifferent clears everything else
+                          set("powertrain", sel ? [] : ["indifferent"]);
+                        } else {
+                          const without = form.powertrain.filter(x => x !== "indifferent");
+                          set("powertrain", sel ? without.filter(x => x !== v) : [...without, v]);
+                        }
+                      };
+                      return (
+                        <button key={v} type="button" onClick={togglePt}
+                          className="px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150"
+                          style={{
+                            background: sel ? "var(--miami-blue)" : "rgba(255,255,255,0.07)",
+                            color: sel ? "var(--shelby-blue)" : "rgba(255,255,255,0.75)",
+                            border: `1px solid ${sel ? "var(--miami-blue)" : "rgba(255,255,255,0.1)"}`,
+                            fontFamily: "Industry, sans-serif",
+                            minHeight: 40,
+                          }}
+                          data-testid={`btn-powertrain-${v}`}>
+                          {l}
+                        </button>
+                      );
+                    })}
                   </div>
                 </Field>
 
@@ -1439,23 +1609,25 @@ export default function IntakePage() {
 
                 {/* SAFETY & TECHNOLOGY */}
                 <SectionDivider label="Safety & Technology" />
-                <Field label="Safety & Tech Features" hint="select all that apply">
-                  <MultiSelect
-                    options={SAFETY_TECH_CHIPS}
-                    value={form.safetyTechFeatures}
-                    onChange={v => set("safetyTechFeatures", v)}
-                  />
-                </Field>
+                <p style={{ fontSize: 11, color: "rgba(255,255,255,0.65)", marginBottom: 6, lineHeight: 1.5 }}>
+                  Tap once = <span style={{ color: "#1FC3EF", fontWeight: 700 }}>Nice to have</span> &nbsp;·&nbsp; Tap twice = <span style={{ color: "#ADF029", fontWeight: 700 }}>Must have</span> &nbsp;·&nbsp; Tap again to clear
+                </p>
+                <TriStateFeatureList
+                  chips={SAFETY_TECH_CHIPS}
+                  state={form.safetyTechFeatures}
+                  onChange={v => set("safetyTechFeatures", v)}
+                />
 
                 {/* COMFORT & INTERIOR */}
                 <SectionDivider label="Comfort & Interior" />
-                <Field label="Comfort Features" hint="select all that apply">
-                  <MultiSelect
-                    options={COMFORT_CHIPS}
-                    value={form.comfortFeatures}
-                    onChange={v => set("comfortFeatures", v)}
-                  />
-                </Field>
+                <p style={{ fontSize: 11, color: "rgba(255,255,255,0.65)", marginBottom: 6, lineHeight: 1.5 }}>
+                  Tap once = <span style={{ color: "#1FC3EF", fontWeight: 700 }}>Nice to have</span> &nbsp;·&nbsp; Tap twice = <span style={{ color: "#ADF029", fontWeight: 700 }}>Must have</span> &nbsp;·&nbsp; Tap again to clear
+                </p>
+                <TriStateFeatureList
+                  chips={COMFORT_CHIPS}
+                  state={form.comfortFeatures}
+                  onChange={v => set("comfortFeatures", v)}
+                />
 
                 {/* COLORS */}
                 <SectionDivider label="Colors" />
