@@ -152,8 +152,29 @@ function LoginScreen({ onLogin }: { onLogin: (session: ClientSession) => void })
 
 // ─── Progress Hub ─────────────────────────────────────────────────────────────
 
-function ProgressHub({ session, onReset, isUAT }: { session: ClientSession; onReset: () => void; isUAT: boolean }) {
+function ProgressHub({ session, onReset, onSessionUpdate, isUAT }: { session: ClientSession; onReset: () => void; onSessionUpdate: (s: ClientSession) => void; isUAT: boolean }) {
   const [, navigate] = useLocation();
+
+  // Refresh session on every mount so questionnaireComplete reflects DB truth
+  useEffect(() => {
+    apiRequest("GET", `/api/clients/${session.id}`)
+      .then((r) => r.json())
+      .then((client) => {
+        if (client?.id) {
+          onSessionUpdate({
+            id: client.id,
+            email: client.email,
+            phone: client.phone,
+            firstName: client.firstName,
+            lastName: client.lastName,
+            questionnaireComplete: client.questionnaireComplete ?? false,
+            status: client.status ?? "",
+          });
+        }
+      })
+      .catch(() => { /* ignore — session will remain as-is */ });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.id]);
 
   const { data: docs = [] } = useQuery<Document[]>({
     queryKey: ["/api/clients", session.id, "documents"],
@@ -439,6 +460,7 @@ export default function ClientPortalPage() {
     <ProgressHub
       session={session}
       onReset={handleLogout}
+      onSessionUpdate={handleLogin}
       isUAT={isUAT}
     />
   );
