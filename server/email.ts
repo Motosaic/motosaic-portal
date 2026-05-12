@@ -219,8 +219,8 @@ function buildEmailHtml(client: Client): string {
         ${divider()}
 
         ${section("Powertrain")}
-        ${row("Powertrain", c.powertrain?.toUpperCase())}
-        ${(c.powertrain === "ev" || c.powertrain === "phev") ? row("Home Charging", labelFor(c.homeCharging, HOME_CHARGING_LABELS)) : ""}
+        ${(() => { const pt = parseJsonArr(c.powertrain); return pt.length > 0 ? row("Powertrain", pt.map((p: string) => p.charAt(0).toUpperCase() + p.slice(1)).join(" · ")) : ""; })()}
+        ${(() => { const pt = parseJsonArr(c.powertrain); return (pt.includes("ev") || pt.includes("phev")) ? row("Home Charging", labelFor(c.homeCharging, HOME_CHARGING_LABELS)) : ""; })()}
         ${divider()}
 
         ${(() => { const arr = parseJsonArr(c.safetyTechFeatures); return arr.length > 0 ? section("Safety & Technology") + row("Features", arr.join(", ")) + divider() : ""; })()}
