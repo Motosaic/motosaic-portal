@@ -5,24 +5,35 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { Client } from "@shared/schema";
 
-const API = import.meta.env.VITE_API_URL || "https://portal.motosaic.com";
-
-const ADMIN_USERNAME = "Admin";
-const ADMIN_PASSWORD = "AdminMotosaic";
+const API = import.meta.env.VITE_API_BASE ?? "";
 
 function AdminPasswordGate({ onUnlock }: { onUnlock: () => void }) {
-  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-      onUnlock();
-    } else {
-      setError(true);
-      setPassword("");
-      setTimeout(() => setError(false), 2000);
+    setError(null);
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API}/api/auth/admin/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+        credentials: "include",
+      });
+      if (res.ok) {
+        onUnlock();
+      } else {
+        const data = await res.json().catch(() => ({} as { message?: string }));
+        setError(data.message || "Invalid password");
+        setPassword("");
+      }
+    } catch (err: any) {
+      setError(err?.message || "Login failed");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -37,17 +48,6 @@ function AdminPasswordGate({ onUnlock }: { onUnlock: () => void }) {
           <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--miami-blue)", marginBottom: 8 }}>Admin Access</p>
           <h2 style={{ fontSize: 22, fontWeight: 900, color: "white", marginBottom: 24 }}>Dashboard Login</h2>
           <form onSubmit={handleSubmit} autoComplete="on">
-            <label className="intake-label">Username</label>
-            <input
-              type="text"
-              className="intake-input mb-4"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              placeholder="Username"
-              autoComplete="username"
-              autoFocus
-              style={error ? { borderColor: "#ef4444" } : {}}
-            />
             <label className="intake-label">Password</label>
             <input
               type="password"
@@ -56,17 +56,19 @@ function AdminPasswordGate({ onUnlock }: { onUnlock: () => void }) {
               onChange={e => setPassword(e.target.value)}
               placeholder="Password"
               autoComplete="current-password"
+              autoFocus
               style={error ? { borderColor: "#ef4444" } : {}}
             />
             {error && (
-              <p style={{ color: "#ef4444", fontSize: 13, marginTop: 8 }}>Incorrect credentials. Try again.</p>
+              <p style={{ color: "#ef4444", fontSize: 13, marginTop: 8 }}>{error}</p>
             )}
             <button
               type="submit"
-              className="w-full mt-6 rounded-xl font-bold transition-all duration-200 hover:opacity-90"
+              disabled={submitting || !password}
+              className="w-full mt-6 rounded-xl font-bold transition-all duration-200 hover:opacity-90 disabled:opacity-50"
               style={{ background: "var(--miami-blue)", color: "var(--shelby-blue)", fontSize: 14, fontWeight: 700, letterSpacing: "0.05em", minHeight: 48 }}
             >
-              Enter Dashboard
+              {submitting ? "Signing in..." : "Enter Dashboard"}
             </button>
           </form>
         </div>
@@ -83,7 +85,7 @@ function MinervaSheetCard() {
   const { data: sheetData, refetch } = useQuery<{ sheetUrl: string }>({
     queryKey: ["/api/admin/sheet-url"],
     queryFn: async () => {
-      const res = await fetch(`${API}/api/admin/sheet-url`);
+      const res = await fetch(`${API}/api/admin/sheet-url`, { credentials: "include" });
       if (!res.ok) return null as any;
       return res.json();
     },
@@ -97,7 +99,7 @@ function MinervaSheetCard() {
     setSyncing(true);
     setSyncError(null);
     try {
-      const res = await fetch(`${API}/api/admin/sync-sheet`, { method: "POST" });
+      const res = await fetch(`${API}/api/admin/sync-sheet`, { method: "POST", credentials: "include" });
       const json = await res.json();
       if (!res.ok) throw new Error(json.message || "Sync failed");
       refetch();
@@ -399,23 +401,39 @@ function StatCard({ label, value, sub }: { label: string; value: number; sub?: s
   );
 }
 
-// Module-level unlock cache — persists across back-button navigation within the same tab
-let _adminUnlocked = false;
-
 export default function AdminDashboard() {
-  const [unlocked, setUnlocked] = useState(_adminUnlocked);
   const [, navigate] = useLocation();
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [mobileTab, setMobileTab] = useState<"clients" | "new">("clients");
   const queryClient = useQueryClient();
 
+  // Server-side admin session check — re-runs on mount and after login/logout.
+  const { data: authStatus, isLoading: authLoading, refetch: refetchAuth } = useQuery<{ authenticated: boolean }>({
+    queryKey: ["/api/auth/admin/status"],
+    retry: false,
+  });
+  const authenticated = authStatus?.authenticated === true;
+
+  const handleLogout = async () => {
+    try {
+      await fetch(`${API}/api/auth/admin/logout`, { method: "POST", credentials: "include" });
+    } catch {
+      // Swallow — we'll clear local state regardless so the user sees the gate.
+    }
+    queryClient.clear();
+    refetchAuth();
+  };
+
+  // Only fetch admin-scoped data once we have a valid session — avoids 401 noise on the gate.
   const { data: clients = [], isLoading } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
+    enabled: authenticated,
   });
 
   const { data: docMap = {} } = useQuery<Record<number, string[]>>({
     queryKey: ["/api/documents/all"],
+    enabled: authenticated,
   });
 
   const statusMutation = useMutation({
@@ -436,7 +454,12 @@ export default function AdminDashboard() {
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
-  if (!unlocked) return <AdminPasswordGate onUnlock={() => { _adminUnlocked = true; setUnlocked(true); }} />;
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "#001f30" }} />
+    );
+  }
+  if (!authenticated) return <AdminPasswordGate onUnlock={() => refetchAuth()} />;
 
   const filtered = clients.filter(c => {
     const q = search.toLowerCase();
@@ -487,6 +510,19 @@ export default function AdminDashboard() {
         </nav>
         <div className="mt-auto">
           <MinervaSheetCard />
+          <button
+            onClick={handleLogout}
+            data-testid="btn-admin-logout"
+            className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg font-bold text-xs transition-all hover:opacity-90"
+            style={{ background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.08)", letterSpacing: "0.08em", textTransform: "uppercase" }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            Sign Out
+          </button>
         </div>
       </aside>
 

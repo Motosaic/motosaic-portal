@@ -85,7 +85,7 @@ function DropZone({ docType, clientId, onUploaded }: { docType: string; clientId
     fd.append("file", file);
     fd.append("docType", docType);
     try {
-      const res = await fetch(`https://portal.motosaic.com/api/clients/${clientId}/documents`, { method: "POST", body: fd });
+      const res = await fetch(`${import.meta.env.VITE_API_BASE ?? ""}/api/clients/${clientId}/documents`, { method: "POST", body: fd, credentials: "include" });
       if (!res.ok) throw new Error("Upload failed");
       onUploaded();
       toast({ title: "Uploaded successfully", description: file.name });

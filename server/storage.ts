@@ -5,7 +5,7 @@ import * as schema from "@shared/schema";
 import path from "path";
 
 const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), "motosaic.db");
-const sqlite = new Database(DB_PATH);
+export const sqlite = new Database(DB_PATH);
 const db = drizzle(sqlite, { schema });
 
 // Initialize tables — use ALTER TABLE to add new columns if they don't exist
@@ -128,6 +128,7 @@ export interface IStorage {
   markQuestionnaireComplete(id: number): schema.Client | undefined;
   deleteClient(id: number): void;
   // Documents
+  getDocument(id: number): schema.Document | undefined;
   getDocumentsByClient(clientId: number): schema.Document[];
   getAllDocuments(): schema.Document[];
   createDocument(data: schema.InsertDocument): schema.Document;
@@ -227,6 +228,10 @@ export class Storage implements IStorage {
       .where(eq(schema.clients.id, id))
       .returning()
       .get();
+  }
+
+  getDocument(id: number): schema.Document | undefined {
+    return db.select().from(schema.documents).where(eq(schema.documents.id, id)).get();
   }
 
   getDocumentsByClient(clientId: number): schema.Document[] {

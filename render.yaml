@@ -20,3 +20,7 @@ services:
         value: /data/motosaic.db
       - key: SESSION_SECRET
         generateValue: true
+      # Set this in the Render dashboard before first deploy — the /admin route
+      # returns 500 on login until ADMIN_PASSWORD is configured. Pick something strong.
+      - key: ADMIN_PASSWORD
+        sync: false

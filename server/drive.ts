@@ -90,6 +90,14 @@ export async function exchangeCodeForTokens(code: string): Promise<string> {
 
 const PARENT_FOLDER_NAME = "Motosaic Clients";
 
+// Escape a value for inclusion inside a Drive search-query string literal.
+// Per the Drive API: inside `name='...'`, escape `\` and `'` with a leading `\`.
+// Without this, names like "O'Connor" break the query (apostrophe ends the literal)
+// and crafted names could alter query semantics.
+function escapeDriveQ(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
 async function getDrive() {
   const auth = getOAuthClient();
   return google.drive({ version: "v3", auth });
@@ -97,9 +105,10 @@ async function getDrive() {
 
 async function getOrCreateFolder(drive: any, name: string, parentId?: string): Promise<string> {
   // Search for existing folder
+  const safeName = escapeDriveQ(name);
   const q = parentId
-    ? `name='${name}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`
-    : `name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+    ? `name='${safeName}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`
+    : `name='${safeName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
 
   const res = await drive.files.list({ q, fields: "files(id, name)", spaces: "drive" });
   if (res.data.files && res.data.files.length > 0) {
@@ -425,12 +434,12 @@ export async function syncClientToDrive(client: Client, documents: Document[], u
   const pdfName   = "Questionnaire Summary.pdf";
 
   const existingPdf = await drive.files.list({
-    q: `name='${pdfName}' and '${clientFolderId}' in parents and trashed=false`,
+    q: `name='${escapeDriveQ(pdfName)}' and '${clientFolderId}' in parents and trashed=false`,
     fields: "files(id)",
     spaces: "drive",
   });
 
-  if (existingPdf.data.files && existingPdf.data.files.length > 0) {
+  if (existingPdf.data.files && existingPdf.data.files.length > 0 && existingPdf.data.files[0].id) {
     await drive.files.update({
       fileId: existingPdf.data.files[0].id,
       media: { mimeType: "application/pdf", body: Readable.from(pdfBuffer) },
@@ -454,12 +463,12 @@ export async function syncClientToDrive(client: Client, documents: Document[], u
     const driveFileName = `${doc.docType} — ${doc.originalName}`;
 
     const existing = await drive.files.list({
-      q: `name='${driveFileName}' and '${docsFolderId}' in parents and trashed=false`,
+      q: `name='${escapeDriveQ(driveFileName)}' and '${docsFolderId}' in parents and trashed=false`,
       fields: "files(id)",
       spaces: "drive",
     });
 
-    if (existing.data.files && existing.data.files.length > 0) {
+    if (existing.data.files && existing.data.files.length > 0 && existing.data.files[0].id) {
       // Replace content in-place (preserves Drive file URL)
       await drive.files.update({
         fileId: existing.data.files[0].id,
@@ -557,7 +566,7 @@ export async function syncMinervaSheet(
 
   let spreadsheetId: string;
   const searchRes = await drive.files.list({
-    q: `name='${SHEET_TITLE}' and mimeType='application/vnd.google-apps.spreadsheet' and '${parentId}' in parents and trashed=false`,
+    q: `name='${escapeDriveQ(SHEET_TITLE)}' and mimeType='application/vnd.google-apps.spreadsheet' and '${parentId}' in parents and trashed=false`,
     fields: "files(id)",
     spaces: "drive",
   });

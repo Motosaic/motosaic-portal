@@ -38,7 +38,7 @@ function LoginScreen({ onLogin }: { onLogin: (session: ClientSession) => void })
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/client-login", { phone, email });
+      const res = await apiRequest("POST", "/api/auth/client/login", { phone, email });
       return res.json();
     },
     onSuccess: (data: ClientSession) => {

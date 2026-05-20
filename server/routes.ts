@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
 import path from "path";
@@ -8,6 +8,21 @@ import { insertClientSchema, insertDocumentSchema } from "@shared/schema";
 import { z } from "zod";
 import { getAuthUrl, exchangeCodeForTokens, syncClientToDrive, syncMinervaSheet, getStoredSheetUrl } from "./drive";
 import { sendQuestionnaireCompleteEmail } from "./email";
+import { registerAuthRoutes, requireAdmin, requireClientOrAdmin } from "./auth";
+
+// ─── Shared auth resolvers ──────────────────────────────────────────────────
+
+const clientIdFromUrlParam = (req: Request) => {
+  const n = parseInt(String(req.params.id), 10);
+  return Number.isFinite(n) ? n : null;
+};
+
+const clientIdFromDocument = (req: Request) => {
+  const id = parseInt(String(req.params.id), 10);
+  if (!Number.isFinite(id)) return null;
+  const doc = storage.getDocument(id);
+  return doc ? doc.clientId : null;
+};
 
 const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(process.cwd(), "uploads");
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -36,6 +51,9 @@ export function triggerSheetSync() {
 }
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<void> {
+
+  // ─── Auth (login / logout / status) ─────────────────────────────────────
+  registerAuthRoutes(app);
 
   // ─── Google OAuth ────────────────────────────────────────────────────────
 
@@ -69,22 +87,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  // Debug: check what env vars the server actually sees (safe – only shows key presence)
-  app.get("/api/debug/env", (_req, res) => {
-    res.json({
-      NODE_ENV: process.env.NODE_ENV,
-      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ? `set (${process.env.GOOGLE_CLIENT_ID.slice(0, 12)}...)` : "MISSING",
-      GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET ? `set (${process.env.GOOGLE_CLIENT_SECRET.slice(0, 8)}...)` : "MISSING",
-      GOOGLE_REFRESH_TOKEN: process.env.GOOGLE_REFRESH_TOKEN ? `set (${process.env.GOOGLE_REFRESH_TOKEN.slice(0, 12)}...)` : "MISSING",
-      DB_PATH: process.env.DB_PATH || "not set",
-      UPLOADS_DIR: process.env.UPLOADS_DIR || "not set",
-      PORT: process.env.PORT || "not set",
-    });
-  });
-
   // Manual sync trigger (admin use)
-  app.post("/api/clients/:id/sync-drive", async (req, res) => {
-    const id = parseInt(req.params.id);
+  app.post("/api/clients/:id/sync-drive", requireAdmin, async (req, res) => {
+    const id = parseInt(String(req.params.id));
     const client = storage.getClient(id);
     if (!client) return res.status(404).json({ message: "Client not found" });
     try {
@@ -98,7 +103,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // Reseed example clients (admin use — skips if they already exist)
-  app.post("/api/admin/reseed", (_req, res) => {
+  app.post("/api/admin/reseed", requireAdmin, (_req, res) => {
     try {
       const existing = storage.getClients();
       // Only seed if fewer than 4 clients (avoid duplicating real clients)
@@ -210,7 +215,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // ─── Minerva Google Sheet ────────────────────────────────────────────────────────────
 
   // Manual full sync — returns the sheet URL
-  app.post("/api/admin/sync-sheet", async (_req, res) => {
+  app.post("/api/admin/sync-sheet", requireAdmin, async (_req, res) => {
     if (!process.env.GOOGLE_REFRESH_TOKEN) {
       return res.status(503).json({ message: "Google Drive not configured" });
     }
@@ -227,7 +232,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // Return the persisted sheet URL (so the admin dashboard can link to it)
-  app.get("/api/admin/sheet-url", (_req, res) => {
+  app.get("/api/admin/sheet-url", requireAdmin, (_req, res) => {
     const url = getStoredSheetUrl();
     if (url) {
       res.json({ sheetUrl: url });
@@ -237,7 +242,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // All doc types grouped by clientId — used by admin dashboard for at-a-glance status
-  app.get("/api/documents/all", (_req, res) => {
+  app.get("/api/documents/all", requireAdmin, (_req, res) => {
     const docs = storage.getAllDocuments();
     // Return map: { [clientId]: string[] } of uploaded docTypes
     const map: Record<number, string[]> = {};
@@ -250,27 +255,33 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // ─── Clients ────────────────────────────────────────────────────────────
 
-  app.get("/api/clients", (_req, res) => {
+  app.get("/api/clients", requireAdmin, (_req, res) => {
     const clients = storage.getClients();
     res.json(clients);
   });
 
-  app.get("/api/clients/:id", (req, res) => {
-    const id = parseInt(req.params.id);
+  app.get("/api/clients/:id", requireClientOrAdmin(clientIdFromUrlParam), (req, res) => {
+    const id = parseInt(String(req.params.id));
     const client = storage.getClient(id);
     if (!client) return res.status(404).json({ message: "Client not found" });
     res.json(client);
   });
 
   app.post("/api/clients", (req, res) => {
-    // Allow requests from the admin UI (no secret needed) OR from trusted
-    // internal services that present the PORTAL_API_SECRET header.
+    // Allow EITHER:
+    //   1. A logged-in admin session (the dashboard's "New Client" button), OR
+    //   2. A trusted external service presenting a matching PORTAL_API_SECRET header.
+    // Previously this check failed open when the header was absent — anonymous
+    // POSTs created client records. With Phase 1 sessions live we can be strict.
+    const isAdminSession = Boolean(req.session?.admin);
     const portalSecret = process.env.PORTAL_API_SECRET;
     const incomingSecret = req.headers["x-portal-secret"];
-    // If PORTAL_API_SECRET is configured, external calls must present it.
-    // Requests from the same origin (no header) are allowed through — the
-    // admin UI never sends the header and runs on the same domain.
-    if (portalSecret && incomingSecret && incomingSecret !== portalSecret) {
+    const hasValidSecret =
+      typeof portalSecret === "string" &&
+      portalSecret.length > 0 &&
+      typeof incomingSecret === "string" &&
+      incomingSecret === portalSecret;
+    if (!isAdminSession && !hasValidSecret) {
       return res.status(401).json({ message: "Unauthorized" });
     }
     try {
@@ -282,8 +293,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.patch("/api/clients/:id/status", (req, res) => {
-    const id = parseInt(req.params.id);
+  app.patch("/api/clients/:id/status", requireAdmin, (req, res) => {
+    const id = parseInt(String(req.params.id));
     const { status } = z.object({ status: z.string() }).parse(req.body);
     const client = storage.updateClientStatus(id, status);
     if (!client) return res.status(404).json({ message: "Client not found" });
@@ -291,16 +302,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     triggerSheetSync();
   });
 
-  app.patch("/api/clients/:id/notes", (req, res) => {
-    const id = parseInt(req.params.id);
+  app.patch("/api/clients/:id/notes", requireAdmin, (req, res) => {
+    const id = parseInt(String(req.params.id));
     const { notes } = z.object({ notes: z.string() }).parse(req.body);
     const client = storage.updateClientNotes(id, notes);
     if (!client) return res.status(404).json({ message: "Client not found" });
     res.json(client);
   });
 
-  app.patch("/api/clients/:id/assigned-to", (req, res) => {
-    const id = parseInt(req.params.id);
+  app.patch("/api/clients/:id/assigned-to", requireAdmin, (req, res) => {
+    const id = parseInt(String(req.params.id));
     const { assignedTo } = z.object({ assignedTo: z.string().nullable() }).parse(req.body);
     const client = storage.updateClientAssignment(id, assignedTo);
     if (!client) return res.status(404).json({ message: "Client not found" });
@@ -308,8 +319,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     triggerSheetSync();
   });
 
-  app.patch("/api/clients/:id/deal-build", (req, res) => {
-    const id = parseInt(req.params.id);
+  app.patch("/api/clients/:id/deal-build", requireAdmin, (req, res) => {
+    const id = parseInt(String(req.params.id));
     const schema = z.object({
       finalMake: z.string().optional(),
       finalModel: z.string().optional(),
@@ -326,60 +337,27 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(client);
   });
 
-  app.delete("/api/clients/:id", (req, res) => {
-    const id = parseInt(req.params.id);
+  app.delete("/api/clients/:id", requireAdmin, (req, res) => {
+    const id = parseInt(String(req.params.id));
     const client = storage.getClient(id);
     if (!client) return res.status(404).json({ message: "Client not found" });
     storage.deleteClient(id);
     res.json({ message: "Client deleted" });
   });
 
-  app.patch("/api/clients/:id/drive-folder", (req, res) => {
-    const id = parseInt(req.params.id);
+  app.patch("/api/clients/:id/drive-folder", requireAdmin, (req, res) => {
+    const id = parseInt(String(req.params.id));
     const { driveFolder } = z.object({ driveFolder: z.string() }).parse(req.body);
     const client = storage.updateClientDriveFolder(id, driveFolder);
     if (!client) return res.status(404).json({ message: "Client not found" });
     res.json(client);
   });
 
-  // ─── Client identity / session ──────────────────────────────────────────
-
-  // Look up or create a client by name+phone (client "login")
-  app.post("/api/client-login", (req, res) => {
-    const { phone, email, firstName, lastName } = z
-      .object({
-        phone: z.string().min(7),
-        email: z.string().min(3),
-        firstName: z.string().optional(),
-        lastName: z.string().optional(),
-      })
-      .parse(req.body);
-
-    // Look up by email + phone
-    let client = storage.findClientByEmailPhone(email, phone);
-    if (!client) {
-      // Create a new shell — use name if provided, otherwise placeholders
-      client = storage.createClientShell(
-        firstName?.trim() || "New",
-        lastName?.trim() || "Client",
-        phone,
-        email,
-      );
-    }
-    res.json({
-      id: client.id,
-      firstName: client.firstName,
-      lastName: client.lastName,
-      email: client.email ?? "",
-      phone: client.phone ?? "",
-      questionnaireComplete: client.questionnaireComplete,
-      status: client.status,
-    });
-  });
+  // (Client login moved to /api/auth/client/login — see server/auth.ts)
 
   // Save questionnaire progress (PATCH, partial update)
-  app.patch("/api/clients/:id/questionnaire", (req, res) => {
-    const id = parseInt(req.params.id);
+  app.patch("/api/clients/:id/questionnaire", requireClientOrAdmin(clientIdFromUrlParam), (req, res) => {
+    const id = parseInt(String(req.params.id));
     const client = storage.getClient(id);
     if (!client) return res.status(404).json({ message: "Client not found" });
     const updated = storage.updateClientQuestionnaire(id, req.body);
@@ -387,12 +365,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // Mark questionnaire complete + auto-sync to Drive + sheet + email notification
-  app.post("/api/clients/:id/questionnaire-complete", async (req, res) => {
-    const id = parseInt(req.params.id);
+  app.post("/api/clients/:id/questionnaire-complete", requireClientOrAdmin(clientIdFromUrlParam), async (req, res) => {
+    const id = parseInt(String(req.params.id));
     const client = storage.markQuestionnaireComplete(id);
     if (!client) return res.status(404).json({ message: "Client not found" });
     res.json(client);
-    // Fire-and-forget: Drive sync + Minerva sheet + notification email
+    // Fire-and-forget post-processing. The client already has a 200 by this point.
+    // Failures here DON'T reach the user — they're admin/ops problems — but we tag
+    // them with a clear prefix so they're easy to find in Render logs.
+    const tag = `[questionnaire-complete][client=${id} ${client.lastName}/${client.firstName}]`;
     (async () => {
       if (process.env.GOOGLE_REFRESH_TOKEN) {
         try {
@@ -400,19 +381,32 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           const folderUrl = await syncClientToDrive(client, docs, UPLOADS_DIR);
           storage.updateClientDriveFolder(id, folderUrl);
         } catch (err) {
-          console.error("[drive] Sync failed:", err);
+          console.error(`${tag} drive sync failed:`, err);
         }
-        triggerSheetSync();
+        try {
+          triggerSheetSync();
+        } catch (err) {
+          console.error(`${tag} sheet sync trigger failed:`, err);
+        }
+      } else {
+        console.log(`${tag} GOOGLE_REFRESH_TOKEN not configured — skipping Drive/Sheet sync`);
       }
-      // Send notification email (non-blocking, uses same Google OAuth)
-      await sendQuestionnaireCompleteEmail(client);
-    })();
+      try {
+        await sendQuestionnaireCompleteEmail(client);
+      } catch (err) {
+        console.error(`${tag} notification email failed:`, err);
+      }
+    })().catch((err) => {
+      // Defense-in-depth — the IIFE wraps each await in try/catch, but a top-level
+      // throw (e.g. synchronous error before the first await) would otherwise vanish.
+      console.error(`${tag} post-processing IIFE crashed:`, err);
+    });
   });
 
   // ─── Intelligence (Supabase Edge Function proxy) ───────────────────────
 
-  app.get("/api/clients/:id/intelligence", async (req, res) => {
-    const id = parseInt(req.params.id);
+  app.get("/api/clients/:id/intelligence", requireAdmin, async (req, res) => {
+    const id = parseInt(String(req.params.id));
     // Email can come from query param or we look it up from storage
     let email = req.query.email as string | undefined;
     if (!email) {
@@ -458,8 +452,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // ─── Client Chat (Claude AI) ─────────────────────────────────────────────
 
-  app.post("/api/clients/:id/chat", async (req, res) => {
-    const id = parseInt(req.params.id);
+  app.post("/api/clients/:id/chat", requireAdmin, async (req, res) => {
+    const id = parseInt(String(req.params.id));
     const { message, history } = req.body as { message: string; history?: { role: string; content: string }[] };
     if (!message) return res.status(400).json({ message: "Missing message" });
 
@@ -531,15 +525,15 @@ ${JSON.stringify(intelData, null, 2)}`;
 
   // ─── Documents ──────────────────────────────────────────────────────────
 
-  app.get("/api/clients/:id/documents", (req, res) => {
-    const clientId = parseInt(req.params.id);
+  app.get("/api/clients/:id/documents", requireClientOrAdmin(clientIdFromUrlParam), (req, res) => {
+    const clientId = parseInt(String(req.params.id));
     const docs = storage.getDocumentsByClient(clientId);
     res.json(docs);
   });
 
-  app.post("/api/clients/:id/documents", upload.single("file"), async (req, res) => {
+  app.post("/api/clients/:id/documents", requireClientOrAdmin(clientIdFromUrlParam), upload.single("file"), async (req, res) => {
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-    const clientId = parseInt(req.params.id);
+    const clientId = parseInt(String(req.params.id));
     const { docType } = req.body;
 
     const doc = storage.createDocument({
@@ -583,7 +577,7 @@ ${JSON.stringify(intelData, null, 2)}`;
   // Public document upload (uses client id)
   app.post("/api/intake/:id/documents", upload.single("file"), (req, res) => {
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-    const clientId = parseInt(req.params.id);
+    const clientId = parseInt(String(req.params.id));
     const { docType } = req.body;
 
     const client = storage.getClient(clientId);
@@ -600,21 +594,22 @@ ${JSON.stringify(intelData, null, 2)}`;
     res.status(201).json(doc);
   });
 
-  // Serve uploaded files
-  app.get("/api/files/:filename", (req, res) => {
-    const filePath = path.join(UPLOADS_DIR, req.params.filename);
+  // Serve uploaded files — admin only (clients never download their own docs from the portal)
+  app.get("/api/files/:filename", requireAdmin, (req, res) => {
+    const filePath = path.join(UPLOADS_DIR, String(req.params.filename));
     if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File not found" });
     res.sendFile(filePath);
   });
 
-  app.get("/api/files/:filename/download", (req, res) => {
-    const filePath = path.join(UPLOADS_DIR, req.params.filename);
+  app.get("/api/files/:filename/download", requireAdmin, (req, res) => {
+    const filePath = path.join(UPLOADS_DIR, String(req.params.filename));
     if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File not found" });
     res.download(filePath);
   });
 
-  app.delete("/api/documents/:id", (req, res) => {
-    const id = parseInt(req.params.id);
+  // Delete a document — admin OR the owning client (resolved via the doc record).
+  app.delete("/api/documents/:id", requireClientOrAdmin(clientIdFromDocument), (req, res) => {
+    const id = parseInt(String(req.params.id));
     storage.deleteDocument(id);
     res.json({ message: "Deleted" });
   });

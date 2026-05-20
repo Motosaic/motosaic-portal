@@ -3,9 +3,13 @@ import { registerRoutes, triggerSheetSync } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import cors from "cors";
+import { buildSessionMiddleware } from "./auth";
 
 const app = express();
 const httpServer = createServer(app);
+
+// Render terminates TLS at the edge; trust the proxy so secure cookies work.
+app.set("trust proxy", 1);
 
 declare module "http" {
   interface IncomingMessage {
@@ -21,11 +25,9 @@ app.use(
   }),
 );
 
-// Allow the S3-hosted frontend to reach this API
+// CORS: same-origin from the Motosaic-served SPA, plus localhost for dev.
 app.use(cors({
   origin: [
-    /\.perplexity\.ai$/,
-    /\.pplx\.app$/,
     /localhost/,
     /motosaic\.com$/,
   ],
@@ -33,6 +35,9 @@ app.use(cors({
 }));
 
 app.use(express.urlencoded({ extended: false }));
+
+// Session middleware — must come after cors / body parsers, before routes.
+app.use(buildSessionMiddleware());
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -45,29 +50,19 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
+// Request logger — method + path + status + duration only.
+// We DON'T log response bodies: they contain PII (driver's license names, addresses,
+// phone numbers) and full Claude chat replies. If you need body inspection during
+// debugging, attach a temporary logger to the specific route.
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
   res.on("finish", () => {
-    const duration = Date.now() - start;
     if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      log(logLine);
+      const duration = Date.now() - start;
+      log(`${req.method} ${path} ${res.statusCode} in ${duration}ms`);
     }
   });
-
   next();
 });
 
@@ -102,41 +97,57 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
+  // `reusePort` is a Linux SO_REUSEPORT feature; macOS rejects it with ENOTSUP.
+  // We don't run multi-process on the same port, so it's safe to skip everywhere.
   httpServer.listen(
     {
       port,
       host: "0.0.0.0",
-      reusePort: true,
     },
     () => {
       log(`serving on port ${port}`);
     },
   );
 
-  // ─── Daily 6am ET Minerva Sheet sync ────────────────────────────────────────────────────
-  function scheduleDailySheetSync() {
-    const now = new Date();
-    // 6am Eastern = UTC-5 (EST) or UTC-4 (EDT). Use UTC-5 as conservative base.
-    // We schedule based on current UTC time — find next 11:00 UTC (= 6am EST)
-    const TARGET_HOUR_UTC = 11; // 6am ET (EST) = 11am UTC
-    const next = new Date(Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate(),
-      TARGET_HOUR_UTC, 0, 0, 0,
-    ));
-    // If already past today’s 11am UTC, schedule for tomorrow
-    if (now.getTime() >= next.getTime()) {
-      next.setUTCDate(next.getUTCDate() + 1);
+  // ─── Daily 6am ET Minerva Sheet sync ─────────────────────────────────────
+  // Computes the next instant when wall-clock time in America/New_York reads
+  // exactly 06:00. Correct across both EST↔EDT transitions and across midnight.
+  function msUntilNextSixAmET(now: Date = new Date()): { ms: number; targetIso: string } {
+    const fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    const isSixAmET = (t: number): boolean => {
+      const parts = fmt.formatToParts(new Date(t));
+      const hour = parts.find((p) => p.type === "hour")?.value;
+      const minute = parts.find((p) => p.type === "minute")?.value;
+      return hour === "06" && minute === "00";
+    };
+    // Search forward minute-by-minute up to 26 hours (enough to cover any DST
+    // "spring forward" jump where 02:00 ET doesn't exist).
+    const start = now.getTime();
+    const startMinute = start - (start % 60000);
+    for (let m = 1; m < 26 * 60; m++) {
+      const candidate = startMinute + m * 60_000;
+      if (isSixAmET(candidate)) {
+        return { ms: candidate - start, targetIso: new Date(candidate).toISOString() };
+      }
     }
-    const msUntil = next.getTime() - now.getTime();
-    log(`[sheet] Daily sync scheduled in ${Math.round(msUntil / 60000)} min (at ${next.toISOString()})`, "cron");
+    // Fallback: 24h from now (should never hit).
+    const fallback = start + 24 * 3600_000;
+    return { ms: fallback - start, targetIso: new Date(fallback).toISOString() };
+  }
+
+  function scheduleDailySheetSync() {
+    const { ms, targetIso } = msUntilNextSixAmET();
+    log(`[sheet] Daily sync scheduled in ${Math.round(ms / 60000)} min (at ${targetIso})`, "cron");
     setTimeout(() => {
       log("[sheet] Running daily Minerva Sheet sync", "cron");
       triggerSheetSync();
-      // Reschedule for the next day
       scheduleDailySheetSync();
-    }, msUntil);
+    }, ms);
   }
   scheduleDailySheetSync();
 })();

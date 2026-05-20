@@ -350,7 +350,7 @@ function DocPanel({ docs, clientId }: { docs: Document[]; clientId: string }) {
           </div>
           {/* Actions */}
           <div className="flex items-center gap-1.5 md:gap-2 flex-shrink-0">
-            <a href={`https://portal.motosaic.com/api/files/${doc.storedName}/download`}
+            <a href={`${import.meta.env.VITE_API_BASE ?? ""}/api/files/${doc.storedName}/download`}
               download={doc.originalName}
               className="flex items-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:opacity-80"
               style={{ background: "rgba(173,240,41,0.12)", color: "var(--gelbgrun)", border: "1px solid rgba(173,240,41,0.2)", textDecoration: "none", minHeight: 36 }}>
