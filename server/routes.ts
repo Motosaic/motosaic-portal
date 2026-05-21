@@ -10,6 +10,9 @@ import { getAuthUrl, exchangeCodeForTokens, syncClientToDrive, syncMinervaSheet,
 import { sendQuestionnaireCompleteEmail } from "./email";
 import { registerAuthRoutes, requireAdmin, requireClientOrAdmin } from "./auth";
 import { backupNow, getBackupStatus } from "./backup";
+import { checkQuota, recordUsage, getUsageStatus } from "./anthropic-quota";
+import { sqlite } from "./storage";
+import os from "os";
 
 // ─── Shared auth resolvers ──────────────────────────────────────────────────
 
@@ -52,6 +55,30 @@ export function triggerSheetSync() {
 }
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<void> {
+
+  // ─── Health check (public, no auth) ─────────────────────────────────────
+  // For Render's health check + external uptime monitors. Verifies SQLite can
+  // be queried — if the DB connection is broken, returns 503 so Render can
+  // restart instead of leaving us serving requests against a dead DB.
+  const startedAt = Date.now();
+  app.get("/healthz", (_req, res) => {
+    try {
+      // Cheap connectivity probe — SELECT 1
+      const row = sqlite.prepare("SELECT 1 as ok").get() as { ok: number } | undefined;
+      if (!row || row.ok !== 1) {
+        return res.status(503).json({ status: "unhealthy", reason: "db probe returned unexpected value" });
+      }
+      res.json({
+        status: "ok",
+        uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000),
+        node: process.version,
+        platform: `${os.platform()} ${os.arch()}`,
+        memoryRssMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
+      });
+    } catch (err: any) {
+      res.status(503).json({ status: "unhealthy", reason: String(err?.message || err) });
+    }
+  });
 
   // ─── Auth (login / logout / status) ─────────────────────────────────────
   registerAuthRoutes(app);
@@ -236,6 +263,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.get("/api/admin/backup/status", requireAdmin, (_req, res) => {
     res.json(getBackupStatus());
+  });
+
+  app.get("/api/admin/anthropic/usage", requireAdmin, (_req, res) => {
+    res.json(getUsageStatus());
   });
 
   app.post("/api/admin/backup/now", requireAdmin, async (_req, res) => {
@@ -476,6 +507,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
     if (!ANTHROPIC_API_KEY) return res.status(500).json({ message: "Anthropic API key not configured" });
 
+    // Daily spend cap — blocks before the network call so an attacker (or buggy
+    // client looping) can't burn through credits even if they have a session.
+    const quota = checkQuota();
+    if (!quota.ok) {
+      return res.status(quota.statusCode).json({ message: quota.reason });
+    }
+
     // Fetch intelligence profile for this client
     let intelData: any = null;
     try {
@@ -532,6 +570,9 @@ ${JSON.stringify(intelData, null, 2)}`;
       }
       const data = await claudeRes.json() as any;
       const reply = data.content?.[0]?.text ?? "No response";
+      // Track usage for the daily cap. Anthropic returns `usage.input_tokens`
+      // and `usage.output_tokens` on every response.
+      recordUsage(data.usage?.input_tokens ?? 0, data.usage?.output_tokens ?? 0);
       return res.json({ reply });
     } catch (err) {
       console.error("[chat] Error:", err);

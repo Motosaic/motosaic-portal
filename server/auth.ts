@@ -3,6 +3,7 @@ import session from "express-session";
 // better-sqlite3-session-store ships no .d.ts — declare it as `any` for the type-checker.
 // @ts-ignore — runtime export is a factory function `(session) => Store`.
 import betterSqlite3SessionStore from "better-sqlite3-session-store";
+import rateLimit from "express-rate-limit";
 import { timingSafeEqual } from "crypto";
 import { sqlite } from "./storage";
 import { storage } from "./storage";
@@ -95,12 +96,25 @@ export function requireClientOrAdmin(
   };
 }
 
+// ─── Login rate limiter ─────────────────────────────────────────────────────
+// 5 failed attempts per IP per 15 min triggers a temporary block. Successful
+// logins don't count toward the limit (skipSuccessfulRequests). Render's
+// `trust proxy` is set in server/index.ts so req.ip reflects the real client.
+const adminLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  message: { message: "Too many login attempts. Try again in 15 minutes." },
+});
+
 // ─── Auth route registration ────────────────────────────────────────────────
 
 export function registerAuthRoutes(app: Express): void {
   // ── Admin ────────────────────────────────────────────────────────────────
 
-  app.post("/api/auth/admin/login", (req, res) => {
+  app.post("/api/auth/admin/login", adminLoginLimiter, (req, res) => {
     const expected = process.env.ADMIN_PASSWORD;
     if (!expected) {
       return res.status(500).json({ message: "ADMIN_PASSWORD env var not configured" });

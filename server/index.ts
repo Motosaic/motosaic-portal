@@ -1,3 +1,8 @@
+import { initSentry, Sentry } from "./sentry";
+// Init Sentry as early as possible so it can capture errors from later imports.
+// No-op if SENTRY_DSN is unset.
+initSentry();
+
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes, triggerSheetSync } from "./routes";
 import { serveStatic } from "./static";
@@ -5,6 +10,7 @@ import { createServer } from "http";
 import cors from "cors";
 import { buildSessionMiddleware } from "./auth";
 import { scheduleBackupCron } from "./backup";
+import { sqlite } from "./storage";
 
 const app = express();
 const httpServer = createServer(app);
@@ -70,6 +76,10 @@ app.use((req, res, next) => {
 (async () => {
   await registerRoutes(httpServer, app);
 
+  // Sentry error capture — must come AFTER routes, BEFORE the custom error handler.
+  // No-op if SENTRY_DSN isn't set, so safe to leave wired up unconditionally.
+  Sentry.setupExpressErrorHandler(app);
+
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
@@ -109,6 +119,37 @@ app.use((req, res, next) => {
       log(`serving on port ${port}`);
     },
   );
+
+  // ─── Graceful shutdown ──────────────────────────────────────────────────
+  // Render sends SIGTERM during deploys + autoscaling. Without a handler, the
+  // process gets killed mid-request, which can corrupt SQLite writes or drop
+  // in-flight Drive uploads. Drain in-flight connections, then close the DB.
+  let shuttingDown = false;
+  async function shutdown(signal: NodeJS.Signals) {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    log(`received ${signal}, draining…`, "shutdown");
+
+    // Stop accepting new connections; let in-flight ones finish.
+    const drainTimeout = setTimeout(() => {
+      log("drain timeout exceeded (10s) — forcing exit", "shutdown");
+      try { sqlite.close(); } catch { /* ignore */ }
+      process.exit(1);
+    }, 10_000);
+
+    httpServer.close(() => {
+      clearTimeout(drainTimeout);
+      try {
+        sqlite.close();
+        log("SQLite closed cleanly", "shutdown");
+      } catch (err) {
+        log(`SQLite close error: ${String(err)}`, "shutdown");
+      }
+      process.exit(0);
+    });
+  }
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 
   // ─── Daily 6am ET Minerva Sheet sync ─────────────────────────────────────
   // Computes the next instant when wall-clock time in America/New_York reads
