@@ -97,9 +97,14 @@ export function requireClientOrAdmin(
 }
 
 // ─── Login rate limiter ─────────────────────────────────────────────────────
-// 5 failed attempts per IP per 15 min triggers a temporary block. Successful
-// logins don't count toward the limit (skipSuccessfulRequests). Render's
-// `trust proxy` is set in server/index.ts so req.ip reflects the real client.
+// 5 failed attempts per real-client-IP per 15 min triggers a temporary block.
+// Successful logins don't count (skipSuccessfulRequests).
+//
+// Why the custom keyGenerator: requests reach the server via Cloudflare →
+// Render → app. With trust proxy: 1, Express's req.ip is whichever Cloudflare
+// edge proxied the request — and consecutive requests can hit different edges,
+// so the same human looks like several IPs and never trips the limit.
+// CF-Connecting-IP is set by Cloudflare and is the ground-truth client IP.
 const adminLoginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 5,
@@ -107,6 +112,11 @@ const adminLoginLimiter = rateLimit({
   legacyHeaders: false,
   skipSuccessfulRequests: true,
   message: { message: "Too many login attempts. Try again in 15 minutes." },
+  keyGenerator: (req) => {
+    const cf = req.headers["cf-connecting-ip"];
+    if (typeof cf === "string" && cf.length > 0) return cf;
+    return req.ip ?? "unknown";
+  },
 });
 
 // ─── Auth route registration ────────────────────────────────────────────────
