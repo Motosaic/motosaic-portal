@@ -14,6 +14,18 @@ import { checkQuota, recordUsage, getUsageStatus } from "./anthropic-quota";
 import { sqlite } from "./storage";
 import os from "os";
 
+// ─── Supabase intelligence (env-var driven) ─────────────────────────────────
+// Anon JWT used to call the client-profile-query edge function. Prefer the env
+// var so we can rotate it without a code change; fall back to the original
+// committed value for backwards compat (this is a Supabase ANON key — public
+// by design — but env-var indirection still helps if Supabase rotates it).
+const SUPABASE_ANON_JWT =
+  process.env.SUPABASE_ANON_JWT ||
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ua3B1ZmV6d2Jya3VxYnFmZWxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1MDIyMzcsImV4cCI6MjA5MTA3ODIzN30.kji9VxGi-tbKJlSGrofC5A2_m9_D944VjjKUGTQM_YQ";
+const SUPABASE_PROFILE_URL =
+  process.env.SUPABASE_PROFILE_URL ||
+  "https://onkpufezwbrkuqbqfele.supabase.co/functions/v1/client-profile-query";
+
 // ─── Shared auth resolvers ──────────────────────────────────────────────────
 
 const clientIdFromUrlParam = (req: Request) => {
@@ -482,10 +494,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!queryParam) {
         return res.json({ not_found: true });
       }
-      const supabaseUrl = `https://onkpufezwbrkuqbqfele.supabase.co/functions/v1/client-profile-query?${queryParam}`;
+      const supabaseUrl = `${SUPABASE_PROFILE_URL}?${queryParam}`;
       const supabaseRes = await fetch(supabaseUrl, {
         headers: {
-          Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ua3B1ZmV6d2Jya3VxYnFmZWxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1MDIyMzcsImV4cCI6MjA5MTA3ODIzN30.kji9VxGi-tbKJlSGrofC5A2_m9_D944VjjKUGTQM_YQ",
+          Authorization: `Bearer ${SUPABASE_ANON_JWT}`,
           "Content-Type": "application/json",
         },
       });
@@ -533,8 +545,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         ? `email=${encodeURIComponent(email)}`
         : `name=${encodeURIComponent(fullName)}`;
       const supabaseRes = await fetch(
-        `https://onkpufezwbrkuqbqfele.supabase.co/functions/v1/client-profile-query?${queryParam}`,
-        { headers: { Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ua3B1ZmV6d2Jya3VxYnFmZWxlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1MDIyMzcsImV4cCI6MjA5MTA3ODIzN30.kji9VxGi-tbKJlSGrofC5A2_m9_D944VjjKUGTQM_YQ" } }
+        `${SUPABASE_PROFILE_URL}?${queryParam}`,
+        { headers: { Authorization: `Bearer ${SUPABASE_ANON_JWT}` } }
       );
       if (supabaseRes.ok) intelData = await supabaseRes.json();
       // Also attach portal client record
