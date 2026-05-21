@@ -269,6 +269,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(getUsageStatus());
   });
 
+  // Deliberately throws — used to verify Sentry error capture is wired correctly.
+  // Admin-only so it can't be hammered by random visitors.
+  app.get("/api/admin/debug-sentry", requireAdmin, (_req, _res, next) => {
+    next(new Error("Sentry test error from /api/admin/debug-sentry — ignore"));
+  });
+
   app.post("/api/admin/backup/now", requireAdmin, async (_req, res) => {
     try {
       const status = await backupNow();

@@ -1,7 +1,8 @@
-import { initSentry, Sentry } from "./sentry";
-// Init Sentry as early as possible so it can capture errors from later imports.
+// MUST be first import — Sentry.init() runs as a side-effect of this module,
+// so it has a chance to instrument express/other modules before they're loaded.
 // No-op if SENTRY_DSN is unset.
-initSentry();
+import "./instrument";
+import { Sentry } from "./sentry";
 
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes, triggerSheetSync } from "./routes";
