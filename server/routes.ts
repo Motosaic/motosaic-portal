@@ -9,6 +9,7 @@ import { z } from "zod";
 import { getAuthUrl, exchangeCodeForTokens, syncClientToDrive, syncMinervaSheet, getStoredSheetUrl } from "./drive";
 import { sendQuestionnaireCompleteEmail } from "./email";
 import { registerAuthRoutes, requireAdmin, requireClientOrAdmin } from "./auth";
+import { backupNow, getBackupStatus } from "./backup";
 
 // ─── Shared auth resolvers ──────────────────────────────────────────────────
 
@@ -228,6 +229,21 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     } catch (err) {
       console.error("[sheet] Manual sync failed:", err);
       res.status(500).json({ message: "Sheet sync failed", error: String(err) });
+    }
+  });
+
+  // ─── Backups ────────────────────────────────────────────────────────────
+
+  app.get("/api/admin/backup/status", requireAdmin, (_req, res) => {
+    res.json(getBackupStatus());
+  });
+
+  app.post("/api/admin/backup/now", requireAdmin, async (_req, res) => {
+    try {
+      const status = await backupNow();
+      res.json(status);
+    } catch (err: any) {
+      res.status(500).json({ message: "Backup failed", error: String(err?.message || err) });
     }
   });
 

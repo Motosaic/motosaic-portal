@@ -4,6 +4,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import cors from "cors";
 import { buildSessionMiddleware } from "./auth";
+import { scheduleBackupCron } from "./backup";
 
 const app = express();
 const httpServer = createServer(app);
@@ -150,4 +151,9 @@ app.use((req, res, next) => {
     }, ms);
   }
   scheduleDailySheetSync();
+
+  // ─── Daily SQLite backup to Google Drive ─────────────────────────────────
+  // Runs at 3 AM ET (before the 6 AM sheet sync). 14-day retention.
+  // Also kicks a catch-up backup ~30s after boot if today's hasn't run.
+  scheduleBackupCron();
 })();

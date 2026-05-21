@@ -77,6 +77,140 @@ function AdminPasswordGate({ onUnlock }: { onUnlock: () => void }) {
   );
 }
 
+// ─── Backup Status Card ────────────────────────────────────────────────────────────
+function BackupStatusCard() {
+  const [running, setRunning] = useState(false);
+  const [runError, setRunError] = useState<string | null>(null);
+
+  type Status = {
+    lastBackupAt: string | null;
+    lastBackupSize: number | null;
+    lastBackupDriveId: string | null;
+    lastBackupFileName: string | null;
+    lastError: string | null;
+    lastErrorAt: string | null;
+    configured: boolean;
+  };
+
+  const { data: status, refetch } = useQuery<Status>({
+    queryKey: ["/api/admin/backup/status"],
+    queryFn: async () => {
+      const res = await fetch(`${API}/api/admin/backup/status`, { credentials: "include" });
+      if (!res.ok) return null as any;
+      return res.json();
+    },
+    retry: false,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+
+  async function handleBackup() {
+    setRunning(true);
+    setRunError(null);
+    try {
+      const res = await fetch(`${API}/api/admin/backup/now`, { method: "POST", credentials: "include" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || json.error || "Backup failed");
+      refetch();
+    } catch (err: any) {
+      setRunError(err?.message || "Unknown error");
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  function relativeTime(iso: string | null): string {
+    if (!iso) return "never";
+    const ms = Date.now() - new Date(iso).getTime();
+    if (ms < 60_000) return "just now";
+    const mins = Math.floor(ms / 60_000);
+    if (mins < 60) return `${mins} min ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs} hr ago`;
+    const days = Math.floor(hrs / 24);
+    return `${days} day${days === 1 ? "" : "s"} ago`;
+  }
+
+  function formatBytes(b: number | null): string {
+    if (!b) return "";
+    if (b < 1024) return `${b} B`;
+    if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+    return `${(b / 1024 / 1024).toFixed(1)} MB`;
+  }
+
+  const ACCENT = "#1FC3EF"; // Miami Blue
+  const tint = "rgba(31,195,239,0.08)";
+  const tintBorder = "rgba(31,195,239,0.2)";
+  const tintBg = "rgba(31,195,239,0.12)";
+  const tintBorderActive = "rgba(31,195,239,0.25)";
+
+  const isConfigured = status?.configured !== false;
+  const hasBackup = Boolean(status?.lastBackupAt);
+
+  return (
+    <div className="rounded-xl p-4 mb-3" style={{ background: tint, border: `1px solid ${tintBorder}` }}>
+      <p style={{ fontSize: 11, color: ACCENT, fontWeight: 700, marginBottom: 4, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+        Database Backup
+      </p>
+      {!isConfigured ? (
+        <p style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", marginBottom: 8 }}>
+          Google OAuth not configured — backups disabled.
+        </p>
+      ) : hasBackup ? (
+        <div
+          style={{
+            display: "block",
+            fontSize: 11,
+            color: ACCENT,
+            marginBottom: 8,
+            padding: "6px 10px",
+            borderRadius: 8,
+            background: tintBg,
+            border: `1px solid ${tintBorderActive}`,
+          }}
+        >
+          <div style={{ fontWeight: 700 }}>Last: {relativeTime(status!.lastBackupAt)}</div>
+          {status!.lastBackupSize && (
+            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.7)", marginTop: 2 }}>
+              {formatBytes(status!.lastBackupSize)} · 14-day retention
+            </div>
+          )}
+        </div>
+      ) : (
+        <p style={{ fontSize: 11, color: "rgba(255,255,255,0.85)", marginBottom: 8 }}>
+          No backup yet. Click Run to create the first one.
+        </p>
+      )}
+      <button
+        onClick={handleBackup}
+        disabled={running || !isConfigured}
+        style={{
+          width: "100%",
+          fontSize: 11,
+          fontWeight: 700,
+          color: running || !isConfigured ? "rgba(255,255,255,0.4)" : "#001f30",
+          background: running || !isConfigured ? tintBg : ACCENT,
+          border: "none",
+          borderRadius: 8,
+          padding: "6px 0",
+          cursor: running || !isConfigured ? "not-allowed" : "pointer",
+          transition: "all 0.15s",
+          letterSpacing: "0.05em",
+          textTransform: "uppercase",
+        }}
+      >
+        {running ? "Backing up..." : "Back Up Now"}
+      </button>
+      {runError && <p style={{ fontSize: 10, color: "#ef4444", marginTop: 6 }}>{runError}</p>}
+      {!runError && status?.lastError && (
+        <p style={{ fontSize: 10, color: "#f59e0b", marginTop: 6 }} title={status.lastError}>
+          Last error: {status.lastError.slice(0, 60)}{status.lastError.length > 60 ? "…" : ""}
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ─── Minerva Sheet Card ────────────────────────────────────────────────────────────
 function MinervaSheetCard() {
   const [syncing, setSyncing] = useState(false);
@@ -509,6 +643,7 @@ export default function AdminDashboard() {
           </span>
         </nav>
         <div className="mt-auto">
+          <BackupStatusCard />
           <MinervaSheetCard />
           <button
             onClick={handleLogout}
