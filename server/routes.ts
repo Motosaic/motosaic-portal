@@ -14,6 +14,13 @@ import { checkQuota, recordUsage, getUsageStatus } from "./anthropic-quota";
 import { sqlite } from "./storage";
 import { generateDeck, resolveOutputPath } from "./deck-generator/generate";
 import { extractText } from "./deck-generator/extract";
+import {
+  verifyWebhookSignature as verifyZoomSignature,
+  buildUrlValidationResponse as buildZoomUrlValidationResponse,
+  fetchTranscriptVtt as fetchZoomTranscriptVtt,
+  parseVttToPlainText,
+  matchClientByTopic,
+} from "./zoom";
 import os from "os";
 
 // ─── Supabase intelligence (env-var driven) ─────────────────────────────────
@@ -82,6 +89,76 @@ export function triggerSheetSync() {
   ).catch((err) => console.error("[sheet] Background sync failed:", err));
 }
 
+// ─── Zoom transcript ingestion ─────────────────────────────────────────────
+// Called from the /api/zoom/webhook handler on `recording.transcript_completed`.
+// Pulls the VTT, parses it, and inserts a `client_transcripts` row — attached
+// to a matched client by meeting topic, or unattached for manual claim.
+async function ingestZoomTranscript(
+  eventBody: any,
+): Promise<{ transcriptId: number; clientId: number | null; matched: boolean }> {
+  const obj = eventBody?.payload?.object;
+  const downloadToken = eventBody?.download_token;
+
+  if (!obj) throw new Error("Webhook payload missing payload.object");
+  if (typeof downloadToken !== "string" || !downloadToken) {
+    throw new Error("Webhook missing download_token");
+  }
+
+  const recordingFiles = Array.isArray(obj.recording_files) ? obj.recording_files : [];
+  // Zoom labels the VTT file type "TRANSCRIPT" (file_extension "VTT").
+  // There may be other files (audio_only, shared_screen, etc.) in the same event.
+  const transcriptFile = recordingFiles.find((f: any) => f?.file_type === "TRANSCRIPT");
+  if (!transcriptFile) {
+    throw new Error("No TRANSCRIPT file in recording_files");
+  }
+  const downloadUrl = transcriptFile.download_url;
+  if (!downloadUrl || typeof downloadUrl !== "string") {
+    throw new Error("Transcript file missing download_url");
+  }
+
+  // Idempotency: Zoom retries non-2xx deliveries. The same meeting UUID
+  // (unique per occurrence, even for recurring meetings) means we've already
+  // stored this transcript and should no-op.
+  const meetingUuid = typeof obj.uuid === "string" ? obj.uuid : null;
+  if (meetingUuid) {
+    const existing = storage.findTranscriptByZoomUuid(meetingUuid);
+    if (existing) {
+      console.log(`[zoom] meeting ${meetingUuid} already ingested as transcript ${existing.id}`);
+      return { transcriptId: existing.id, clientId: existing.clientId ?? null, matched: existing.clientId !== null };
+    }
+  }
+
+  const vtt = await fetchZoomTranscriptVtt(downloadUrl, downloadToken);
+  const transcriptText = parseVttToPlainText(vtt);
+
+  const matched = matchClientByTopic(obj.topic, storage.getClients());
+
+  const inserted = storage.createTranscript({
+    clientId: matched?.id ?? null,
+    source: "zoom",
+    zoomMeetingUuid: meetingUuid,
+    zoomMeetingId: obj.id != null ? String(obj.id) : null,
+    meetingTopic: typeof obj.topic === "string" ? obj.topic : null,
+    meetingStartTime: typeof obj.start_time === "string" ? obj.start_time : null,
+    meetingDurationMinutes: typeof obj.duration === "number" ? obj.duration : null,
+    hostEmail: typeof obj.host_email === "string" ? obj.host_email : null,
+    transcriptText,
+    rawPayload: JSON.stringify(eventBody),
+  } as any);
+
+  console.log(
+    `[zoom] ingested transcript id=${inserted.id} ` +
+      `matched=${matched ? `client_${matched.id}` : "unattached"} ` +
+      `topic="${obj.topic ?? ""}"`,
+  );
+
+  return {
+    transcriptId: inserted.id,
+    clientId: matched?.id ?? null,
+    matched: matched !== undefined,
+  };
+}
+
 export async function registerRoutes(httpServer: Server, app: Express): Promise<void> {
 
   // ─── Health check (public, no auth) ─────────────────────────────────────
@@ -106,6 +183,59 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     } catch (err: any) {
       res.status(503).json({ status: "unhealthy", reason: String(err?.message || err) });
     }
+  });
+
+  // ─── Zoom webhook (public, HMAC-gated) ───────────────────────────────────
+  // Fires on `recording.transcript_completed`. We verify the HMAC signature,
+  // handle Zoom's URL-validation handshake on first setup, and ingest the
+  // transcript by downloading the VTT (using the short-lived download_token
+  // included in the event), parsing it to plain text, and attaching it to a
+  // client by meeting-topic match — or leaving it unattached for manual claim.
+  app.post("/api/zoom/webhook", async (req, res) => {
+    // Feature flag: lets us deploy the endpoint dark and turn on once the
+    // Zoom marketplace side is fully configured.
+    if (process.env.ZOOM_TRANSCRIPT_INGEST_ENABLED !== "true") {
+      return res.status(503).json({ message: "Zoom ingest not enabled" });
+    }
+
+    const rawBody = (req as any).rawBody as Buffer | undefined;
+    const timestamp = req.headers["x-zm-request-timestamp"] as string | undefined;
+    const signature = req.headers["x-zm-signature"] as string | undefined;
+
+    if (!verifyZoomSignature(rawBody, timestamp, signature)) {
+      console.warn("[zoom] webhook signature verification failed");
+      return res.status(401).json({ message: "Invalid signature" });
+    }
+
+    const event = req.body?.event;
+
+    // URL validation handshake — Zoom calls this once when you add or edit the
+    // webhook URL in the marketplace UI. Must respond within ~3s.
+    if (event === "endpoint.url_validation") {
+      const plainToken = req.body?.payload?.plainToken;
+      if (typeof plainToken !== "string") {
+        return res.status(400).json({ message: "Missing plainToken" });
+      }
+      return res.json(buildZoomUrlValidationResponse(plainToken));
+    }
+
+    if (event === "recording.transcript_completed") {
+      try {
+        const result = await ingestZoomTranscript(req.body);
+        return res.status(200).json(result);
+      } catch (err: any) {
+        console.error("[zoom] transcript ingest failed:", err);
+        // Return 200 so Zoom doesn't retry indefinitely on data we can't
+        // recover (the error is logged + Sentry'd; retries won't help).
+        return res.status(200).json({
+          message: "Ingest failed; logged",
+          error: String(err?.message || err),
+        });
+      }
+    }
+
+    // Unhandled event type — ack so Zoom marks delivery successful.
+    return res.status(200).json({ message: "Event acknowledged" });
   });
 
   // ─── Auth (login / logout / status) ─────────────────────────────────────

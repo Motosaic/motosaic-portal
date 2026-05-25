@@ -110,6 +110,25 @@ sqlite.exec(`
   CREATE INDEX IF NOT EXISTS idx_deck_messages_draft ON deck_messages(draft_id, id);
   CREATE INDEX IF NOT EXISTS idx_deck_attachments_draft ON deck_attachments(draft_id);
   CREATE INDEX IF NOT EXISTS idx_deck_outputs_draft ON deck_outputs(draft_id, version DESC);
+
+  CREATE TABLE IF NOT EXISTS client_transcripts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id INTEGER,
+    source TEXT NOT NULL DEFAULT 'zoom',
+    zoom_meeting_uuid TEXT,
+    zoom_meeting_id TEXT,
+    meeting_topic TEXT,
+    meeting_start_time TEXT,
+    meeting_duration_minutes INTEGER,
+    host_email TEXT,
+    transcript_text TEXT NOT NULL,
+    raw_payload TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_client_transcripts_client ON client_transcripts(client_id);
+  CREATE INDEX IF NOT EXISTS idx_client_transcripts_unattached ON client_transcripts(client_id) WHERE client_id IS NULL;
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_client_transcripts_uuid ON client_transcripts(zoom_meeting_uuid) WHERE zoom_meeting_uuid IS NOT NULL;
 `);
 
 // Safe migrations for existing databases
@@ -162,6 +181,10 @@ addColumnIfMissing("clients", "home_charging", "TEXT");
 addColumnIfMissing("clients", "safety_tech_features", "TEXT");
 addColumnIfMissing("clients", "comfort_features", "TEXT");
 addColumnIfMissing("clients", "additional_notes", "TEXT");
+// Briefing / dossier fields (Phase 5)
+addColumnIfMissing("clients", "briefing_context", "TEXT");
+addColumnIfMissing("clients", "briefing_summary", "TEXT");
+addColumnIfMissing("clients", "briefing_summary_generated_at", "TEXT");
 
 export interface IStorage {
   // Clients
@@ -205,6 +228,14 @@ export interface IStorage {
   getOutput(id: number): schema.DeckOutput | undefined;
   createOutput(data: schema.InsertDeckOutput): schema.DeckOutput;
   nextVersionForDraft(draftId: number): number;
+  // Client transcripts
+  listTranscriptsByClient(clientId: number): schema.ClientTranscript[];
+  listUnattachedTranscripts(): schema.ClientTranscript[];
+  getTranscript(id: number): schema.ClientTranscript | undefined;
+  findTranscriptByZoomUuid(uuid: string): schema.ClientTranscript | undefined;
+  createTranscript(data: schema.InsertClientTranscript): schema.ClientTranscript;
+  attachTranscriptToClient(id: number, clientId: number): schema.ClientTranscript | undefined;
+  deleteTranscript(id: number): void;
 }
 
 export class Storage implements IStorage {
@@ -324,6 +355,12 @@ export class Storage implements IStorage {
 
   deleteClient(id: number): void {
     db.delete(schema.documents).where(eq(schema.documents.clientId, id)).run();
+    // Transcripts get detached, not deleted — they may have stand-alone value
+    // and re-deleting from the unattached tray is one click.
+    db.update(schema.clientTranscripts)
+      .set({ clientId: null })
+      .where(eq(schema.clientTranscripts.clientId, id))
+      .run();
     db.delete(schema.clients).where(eq(schema.clients.id, id)).run();
   }
 
@@ -497,6 +534,55 @@ export class Storage implements IStorage {
       .limit(1)
       .get();
     return (latest?.version ?? 0) + 1;
+  }
+
+  // ─── Client transcripts ──────────────────────────────────────────────────
+  listTranscriptsByClient(clientId: number): schema.ClientTranscript[] {
+    return db
+      .select()
+      .from(schema.clientTranscripts)
+      .where(eq(schema.clientTranscripts.clientId, clientId))
+      .orderBy(desc(schema.clientTranscripts.meetingStartTime))
+      .all();
+  }
+
+  listUnattachedTranscripts(): schema.ClientTranscript[] {
+    // Drizzle's `eq` won't generate `IS NULL`, so use a raw predicate.
+    return db
+      .select()
+      .from(schema.clientTranscripts)
+      .where(sql`${schema.clientTranscripts.clientId} IS NULL`)
+      .orderBy(desc(schema.clientTranscripts.createdAt))
+      .all();
+  }
+
+  getTranscript(id: number): schema.ClientTranscript | undefined {
+    return db.select().from(schema.clientTranscripts).where(eq(schema.clientTranscripts.id, id)).get();
+  }
+
+  findTranscriptByZoomUuid(uuid: string): schema.ClientTranscript | undefined {
+    return db
+      .select()
+      .from(schema.clientTranscripts)
+      .where(eq(schema.clientTranscripts.zoomMeetingUuid, uuid))
+      .get();
+  }
+
+  createTranscript(data: schema.InsertClientTranscript): schema.ClientTranscript {
+    return db.insert(schema.clientTranscripts).values(data).returning().get();
+  }
+
+  attachTranscriptToClient(id: number, clientId: number): schema.ClientTranscript | undefined {
+    return db
+      .update(schema.clientTranscripts)
+      .set({ clientId })
+      .where(eq(schema.clientTranscripts.id, id))
+      .returning()
+      .get();
+  }
+
+  deleteTranscript(id: number): void {
+    db.delete(schema.clientTranscripts).where(eq(schema.clientTranscripts.id, id)).run();
   }
 }
 

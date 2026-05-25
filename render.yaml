@@ -24,3 +24,19 @@ services:
       # returns 500 on login until ADMIN_PASSWORD is configured. Pick something strong.
       - key: ADMIN_PASSWORD
         sync: false
+      # ─── Zoom transcript ingestion ─────────────────────────────────────────
+      # Set ZOOM_WEBHOOK_SECRET_TOKEN before flipping ZOOM_TRANSCRIPT_INGEST_ENABLED
+      # to "true". Without the token, all webhook signature checks fail.
+      # ZOOM_ACCOUNT_ID, ZOOM_CLIENT_ID, ZOOM_CLIENT_SECRET aren't used in v1
+      # (download_token in the webhook payload authorizes the transcript fetch);
+      # they're reserved for the planned phase-2 backfill / list-recordings work.
+      - key: ZOOM_WEBHOOK_SECRET_TOKEN
+        sync: false
+      - key: ZOOM_TRANSCRIPT_INGEST_ENABLED
+        value: "false"
+      - key: ZOOM_ACCOUNT_ID
+        sync: false
+      - key: ZOOM_CLIENT_ID
+        sync: false
+      - key: ZOOM_CLIENT_SECRET
+        sync: false

@@ -85,6 +85,10 @@ export const clients = sqliteTable("clients", {
   notes: text("notes"),
   driveFolder: text("drive_folder"),
   createdAt: text("created_at").default(new Date().toISOString()),
+  // Briefing / dossier (Phase 5)
+  briefingContext: text("briefing_context"),            // operator's free-form context paste box
+  briefingSummary: text("briefing_summary"),            // cached Claude synthesis
+  briefingSummaryGeneratedAt: text("briefing_summary_generated_at"),
 });
 
 export const insertClientSchema = createInsertSchema(clients).omit({
@@ -211,3 +215,34 @@ export const insertDeckOutputSchema = createInsertSchema(deckOutputs).omit({
 });
 export type InsertDeckOutput = z.infer<typeof insertDeckOutputSchema>;
 export type DeckOutput = typeof deckOutputs.$inferSelect;
+
+// ─── Client Transcripts ────────────────────────────────────────────────────
+// Discovery-call (and follow-up) transcripts. Ingested via the Zoom webhook
+// (recording.transcript_completed), parsed from VTT into plain text, and
+// either auto-attached to a matched client or held in an "unattached" tray
+// until an admin claims them.
+//
+// clientId is nullable: null = unattached. The webhook tries to match the
+// Zoom meeting topic against client first/last names; when there's no match,
+// the row lands here for manual claim from the admin dashboard.
+export const clientTranscripts = sqliteTable("client_transcripts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clientId: integer("client_id"),                            // null = unattached
+  source: text("source").notNull().default("zoom"),          // "zoom" | "manual" (future)
+  zoomMeetingUuid: text("zoom_meeting_uuid"),                // Zoom's meeting UUID (unique per occurrence)
+  zoomMeetingId: text("zoom_meeting_id"),                    // human-readable numeric meeting ID
+  meetingTopic: text("meeting_topic"),
+  meetingStartTime: text("meeting_start_time"),              // ISO from Zoom
+  meetingDurationMinutes: integer("meeting_duration_minutes"),
+  hostEmail: text("host_email"),
+  transcriptText: text("transcript_text").notNull(),         // VTT parsed to plain text
+  rawPayload: text("raw_payload"),                           // JSON of the original webhook event, for debugging
+  createdAt: text("created_at").default(new Date().toISOString()),
+});
+
+export const insertClientTranscriptSchema = createInsertSchema(clientTranscripts).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertClientTranscript = z.infer<typeof insertClientTranscriptSchema>;
+export type ClientTranscript = typeof clientTranscripts.$inferSelect;
