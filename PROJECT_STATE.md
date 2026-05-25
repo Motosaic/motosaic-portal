@@ -283,6 +283,14 @@ render.yaml       Render deploy config
 - [x] Anthropic chat (admin only)
 - [x] Supabase intelligence edge function
 
+### Deck generator *(in progress — Phase 4)*
+- [x] Schema: `deck_drafts`, `deck_messages`, `deck_attachments`, `deck_outputs` + storage methods
+- [ ] House-style.md committed to `server/deck-generator/`
+- [ ] Generate endpoint (assembles prompt + questionnaire + attachments + chat → Claude → JSON → Python subprocess → .pptx → Drive)
+- [ ] Persistent chat endpoint scoped per draft
+- [ ] Attachment upload + PDF/text extraction (pypdf path verified)
+- [ ] `/decks` top-level frontend section: list, workspace, attachments pane, Generate button, past outputs list
+
 ---
 
 ## Known Issues / Open Bugs
@@ -374,10 +382,35 @@ To be added in Phase 1:
 - [ ] Fix `enabled` flag on UploadPage documents query
 - [ ] Decide on Drizzle migration workflow (use it or remove it)
 
+### Phase 4 — MotoMatch Deck Generator *(in progress — 2026-05-23)*
+
+Replaces the Perplexity-based deck workflow with an in-portal Claude-driven generator. Architecture: top-level `/decks` section, per-draft chat + attachments, single-shot Generate that re-derives deck JSON from full chat history and pipes it into the existing `python-pptx` build script.
+
+- [x] Schema: 4 tables (`deck_drafts`, `deck_messages`, `deck_attachments`, `deck_outputs`) + indexes + storage methods. Typecheck green.
+- [x] `house-style.md` committed at `server/deck-generator/house-style.md` (v2 with read-aloud test + copywriter-phrase ban list; pressure-tested vs Daniels-MaryKay materials)
+- [x] `build_motomatch_template.py` + 4 logo PNGs copied into `server/deck-generator/assets/logos/`
+- [x] `render.py` wrapper: thin JSON-config → invoke-template adapter. Reassigns module-level CLIENT/VEHICLES/COMPARISON_ROWS, re-derives PHOTOS/TOTAL_VEHICLES, optionally patches out the comparison slide.
+- [x] `requirements.txt` (python-pptx, Pillow, lxml, pypdf)
+- [x] `render.yaml` `buildCommand` updated to `pip3 install --user -r server/deck-generator/requirements.txt && npm install && npm run build`
+- [x] **End-to-end smoke test passes:** Daniels-MaryKay pressure-test JSON → render.py → 8-slide .pptx (180KB), all counters correct, all branding intact. Pipeline reproducible from JSON.
+- [x] **Generate endpoint** (`POST /api/decks/:id/generate`) — single-shot, Opus model, system prompt = `house-style.md`, validates LLM JSON via zod, spawns `render.py`, persists `deck_outputs` with full `compiledJson` + `houseStyleSnapshot` + token counts. Errors surface as assistant messages in chat. Wired through `anthropic-quota.ts`. Logic lives in `server/deck-generator/generate.ts`.
+- [x] **Draft CRUD** (`POST /api/decks`, `GET /api/decks`, `GET /api/decks/:id`)
+- [x] **Persistent chat endpoint** (`GET /api/decks/:id/messages`, `POST /api/decks/:id/messages`) — distinct from the ad-hoc `/api/clients/:id/chat`
+- [x] **Output download** (`GET /api/decks/:draftId/outputs/:outputId/file`)
+- [x] **Attachment upload + text extraction** (`GET /POST /DELETE` `/api/decks/:id/attachments`) — PDFs go through `python3 -c "pypdf..."` inline, .txt/.md/.json/etc. read directly in Node. Extraction at upload time so Generate doesn't re-spawn python per attachment. Files stored under `${UPLOADS_DIR}/deck-attachments/`. List endpoint strips `contentText` to keep payloads small (returns `hasContentText` boolean instead).
+- [x] **DELETE/PATCH draft endpoints** — `PATCH` updates title or status (active/archived). `DELETE` cascades messages/attachments/outputs and unlinks files from disk.
+- [x] **Prompt tweaks v3** (in `house-style.md`): 3-row interpretation clarified (3-row OK when client selected both body styles), two more banned phrases (`earns its spot`, `if X is the headline`), explicit instruction that `client.date` comes from the `DECK DATE` section of the user payload (no longer guessed from training cutoff).
+- [x] **Current-date injection** in `generate.ts` — `buildUserPayload` now prepends a `DECK DATE` section with the actual current month/year.
+- [ ] Frontend `/decks` section: list page (with client filter), workspace page (chat + attachments + Generate + past outputs)
+- [ ] Drive sync for output `.pptx` (deferred — Phase 4.5)
+- [x] `server/deck-generator/photo-sourcing.md` committed — canonical sourcing instructions (ported from Mike's Perplexity-era playbook), first-class artifact same as house-style.md
+- [ ] **Phase 4.5 — Photo sourcing pipeline.** Separate Claude call with Anthropic `web_search` tool enabled, runs *after* deck pruning (not during initial Generate). Per-vehicle output `{front_url, rear_url, interior_url}` → Node downloads + verifies (≥800px, >5KB) → falls back to placeholder per-slot on failure. UI: workspace shows 3 photo slots per vehicle with `empty | sourced | manual` status. "Source Photos" button runs against the current vehicle list; per-slot manual upload override always available.
+
 ### Future / On Hold
 - [ ] Decide whether to extend this portal to handle pre-sale pipeline (Zoom transcript dashboard), or build separately
 - [ ] Dealer contact management tool integration (see business notes)
 - [ ] MotoMatch integration points (TBD)
+- [ ] Multi-user auth (currently single shared admin password — `deck_drafts.created_by` is captured now so attribution is ready when Lexi onboards)
 
 ---
 
@@ -386,6 +419,12 @@ To be added in Phase 1:
 *(Record architectural/strategic decisions here as they're made, with date and rationale)*
 
 - **YYYY-MM-DD:** *(example)* Chose to extend portal vs. build separate pipeline dashboard because [reasoning].
+- **2026-05-23:** Built MotoMatch deck generator into the portal vs. standalone tool. Reused existing auth, SQLite + backup, Drive sync, Anthropic spend cap. Standalone would have duplicated ~70% of infra for no gain.
+- **2026-05-23:** Deck workspace lives at top-level `/decks`, not as a per-client tab. Deck work is its own workflow; "show me all drafts in flight" is a useful view a per-client tab can't give. From each client's detail page, a small link goes to pre-filtered `/decks?client=...`.
+- **2026-05-23:** Stateless re-derivation — every Generate re-reads the full chat history and derives the deck JSON from scratch. No `deck_state` table to keep in sync. Trade-off: long chats cost more tokens per Generate, and model may interpret meandering chats differently across versions. Mitigation: `compiledJson` saved on every output, so diff is observable.
+- **2026-05-23:** `house-style.md` content (not just commit SHA) snapshotted into each `deck_outputs` row. Prevents mid-draft style edits from silently changing regenerated decks.
+- **2026-05-23:** Questionnaire data is NOT snapshotted as a deck attachment — it's read live from `clients` on every Generate. Lets questionnaire edits flow through immediately.
+- **2026-05-23:** Single shared admin password retained for now. `deck_drafts.created_by` captures operator attribution so Lexi's eventual onboarding doesn't require a backfill.
 
 ---
 

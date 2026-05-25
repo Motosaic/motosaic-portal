@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, asc, sql } from "drizzle-orm";
 import * as schema from "@shared/schema";
 import path from "path";
 
@@ -60,6 +60,56 @@ sqlite.exec(`
     drive_file_id TEXT,
     uploaded_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS deck_drafts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_id INTEGER NOT NULL,
+    title TEXT,
+    status TEXT DEFAULT 'active',
+    created_by TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS deck_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    draft_id INTEGER NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS deck_attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    draft_id INTEGER NOT NULL,
+    filename TEXT NOT NULL,
+    stored_name TEXT NOT NULL,
+    mime_type TEXT NOT NULL,
+    file_size INTEGER NOT NULL,
+    content_text TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS deck_outputs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    draft_id INTEGER NOT NULL,
+    version INTEGER NOT NULL,
+    file_path TEXT NOT NULL,
+    drive_file_id TEXT,
+    compiled_json TEXT NOT NULL,
+    house_style_snapshot TEXT NOT NULL,
+    house_style_commit TEXT,
+    model_used TEXT,
+    tokens_input INTEGER,
+    tokens_output INTEGER,
+    generated_at TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_deck_drafts_client ON deck_drafts(client_id);
+  CREATE INDEX IF NOT EXISTS idx_deck_drafts_updated ON deck_drafts(updated_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_deck_messages_draft ON deck_messages(draft_id, id);
+  CREATE INDEX IF NOT EXISTS idx_deck_attachments_draft ON deck_attachments(draft_id);
+  CREATE INDEX IF NOT EXISTS idx_deck_outputs_draft ON deck_outputs(draft_id, version DESC);
 `);
 
 // Safe migrations for existing databases
@@ -133,6 +183,28 @@ export interface IStorage {
   getAllDocuments(): schema.Document[];
   createDocument(data: schema.InsertDocument): schema.Document;
   deleteDocument(id: number): void;
+  // Deck drafts
+  listDrafts(opts?: { status?: string }): schema.DeckDraft[];
+  listDraftsByClient(clientId: number, opts?: { status?: string }): schema.DeckDraft[];
+  getDraft(id: number): schema.DeckDraft | undefined;
+  createDraft(data: schema.InsertDeckDraft): schema.DeckDraft;
+  updateDraftStatus(id: number, status: string): schema.DeckDraft | undefined;
+  updateDraftTitle(id: number, title: string): schema.DeckDraft | undefined;
+  touchDraft(id: number): void;
+  deleteDraft(id: number): void;
+  // Deck messages
+  listMessagesByDraft(draftId: number): schema.DeckMessage[];
+  createMessage(data: schema.InsertDeckMessage): schema.DeckMessage;
+  // Deck attachments
+  listAttachmentsByDraft(draftId: number): schema.DeckAttachment[];
+  getAttachment(id: number): schema.DeckAttachment | undefined;
+  createAttachment(data: schema.InsertDeckAttachment): schema.DeckAttachment;
+  deleteAttachment(id: number): void;
+  // Deck outputs
+  listOutputsByDraft(draftId: number): schema.DeckOutput[];
+  getOutput(id: number): schema.DeckOutput | undefined;
+  createOutput(data: schema.InsertDeckOutput): schema.DeckOutput;
+  nextVersionForDraft(draftId: number): number;
 }
 
 export class Storage implements IStorage {
@@ -270,6 +342,161 @@ export class Storage implements IStorage {
     finalDealNotes?: string;
   }): schema.Client | undefined {
     return db.update(schema.clients).set(data).where(eq(schema.clients.id, id)).returning().get();
+  }
+
+  // ─── Deck drafts ─────────────────────────────────────────────────────────
+  listDrafts(opts?: { status?: string }): schema.DeckDraft[] {
+    if (opts?.status) {
+      return db
+        .select()
+        .from(schema.deckDrafts)
+        .where(eq(schema.deckDrafts.status, opts.status))
+        .orderBy(desc(schema.deckDrafts.updatedAt))
+        .all();
+    }
+    return db
+      .select()
+      .from(schema.deckDrafts)
+      .orderBy(desc(schema.deckDrafts.updatedAt))
+      .all();
+  }
+
+  listDraftsByClient(clientId: number, opts?: { status?: string }): schema.DeckDraft[] {
+    if (opts?.status) {
+      return db
+        .select()
+        .from(schema.deckDrafts)
+        .where(
+          and(
+            eq(schema.deckDrafts.clientId, clientId),
+            eq(schema.deckDrafts.status, opts.status)
+          )
+        )
+        .orderBy(desc(schema.deckDrafts.updatedAt))
+        .all();
+    }
+    return db
+      .select()
+      .from(schema.deckDrafts)
+      .where(eq(schema.deckDrafts.clientId, clientId))
+      .orderBy(desc(schema.deckDrafts.updatedAt))
+      .all();
+  }
+
+  getDraft(id: number): schema.DeckDraft | undefined {
+    return db.select().from(schema.deckDrafts).where(eq(schema.deckDrafts.id, id)).get();
+  }
+
+  createDraft(data: schema.InsertDeckDraft): schema.DeckDraft {
+    return db.insert(schema.deckDrafts).values(data).returning().get();
+  }
+
+  updateDraftStatus(id: number, status: string): schema.DeckDraft | undefined {
+    return db
+      .update(schema.deckDrafts)
+      .set({ status, updatedAt: sql`(datetime('now'))` as any })
+      .where(eq(schema.deckDrafts.id, id))
+      .returning()
+      .get();
+  }
+
+  updateDraftTitle(id: number, title: string): schema.DeckDraft | undefined {
+    return db
+      .update(schema.deckDrafts)
+      .set({ title, updatedAt: sql`(datetime('now'))` as any })
+      .where(eq(schema.deckDrafts.id, id))
+      .returning()
+      .get();
+  }
+
+  touchDraft(id: number): void {
+    db.update(schema.deckDrafts)
+      .set({ updatedAt: sql`(datetime('now'))` as any })
+      .where(eq(schema.deckDrafts.id, id))
+      .run();
+  }
+
+  // Cascade delete. File cleanup (attachments + outputs on disk) is the
+  // route handler's job — call this AFTER unlinking files, matching the
+  // existing deleteClient pattern.
+  deleteDraft(id: number): void {
+    db.delete(schema.deckOutputs).where(eq(schema.deckOutputs.draftId, id)).run();
+    db.delete(schema.deckAttachments).where(eq(schema.deckAttachments.draftId, id)).run();
+    db.delete(schema.deckMessages).where(eq(schema.deckMessages.draftId, id)).run();
+    db.delete(schema.deckDrafts).where(eq(schema.deckDrafts.id, id)).run();
+  }
+
+  // ─── Deck messages ───────────────────────────────────────────────────────
+  listMessagesByDraft(draftId: number): schema.DeckMessage[] {
+    return db
+      .select()
+      .from(schema.deckMessages)
+      .where(eq(schema.deckMessages.draftId, draftId))
+      .orderBy(asc(schema.deckMessages.id))
+      .all();
+  }
+
+  createMessage(data: schema.InsertDeckMessage): schema.DeckMessage {
+    const msg = db.insert(schema.deckMessages).values(data).returning().get();
+    this.touchDraft(data.draftId);
+    return msg;
+  }
+
+  // ─── Deck attachments ────────────────────────────────────────────────────
+  listAttachmentsByDraft(draftId: number): schema.DeckAttachment[] {
+    return db
+      .select()
+      .from(schema.deckAttachments)
+      .where(eq(schema.deckAttachments.draftId, draftId))
+      .orderBy(asc(schema.deckAttachments.id))
+      .all();
+  }
+
+  getAttachment(id: number): schema.DeckAttachment | undefined {
+    return db.select().from(schema.deckAttachments).where(eq(schema.deckAttachments.id, id)).get();
+  }
+
+  createAttachment(data: schema.InsertDeckAttachment): schema.DeckAttachment {
+    const att = db.insert(schema.deckAttachments).values(data).returning().get();
+    this.touchDraft(data.draftId);
+    return att;
+  }
+
+  deleteAttachment(id: number): void {
+    const att = this.getAttachment(id);
+    db.delete(schema.deckAttachments).where(eq(schema.deckAttachments.id, id)).run();
+    if (att) this.touchDraft(att.draftId);
+  }
+
+  // ─── Deck outputs ────────────────────────────────────────────────────────
+  listOutputsByDraft(draftId: number): schema.DeckOutput[] {
+    return db
+      .select()
+      .from(schema.deckOutputs)
+      .where(eq(schema.deckOutputs.draftId, draftId))
+      .orderBy(desc(schema.deckOutputs.version))
+      .all();
+  }
+
+  getOutput(id: number): schema.DeckOutput | undefined {
+    return db.select().from(schema.deckOutputs).where(eq(schema.deckOutputs.id, id)).get();
+  }
+
+  createOutput(data: schema.InsertDeckOutput): schema.DeckOutput {
+    const out = db.insert(schema.deckOutputs).values(data).returning().get();
+    this.touchDraft(data.draftId);
+    return out;
+  }
+
+  nextVersionForDraft(draftId: number): number {
+    const latest = db
+      .select()
+      .from(schema.deckOutputs)
+      .where(eq(schema.deckOutputs.draftId, draftId))
+      .orderBy(desc(schema.deckOutputs.version))
+      .limit(1)
+      .get();
+    return (latest?.version ?? 0) + 1;
   }
 }
 

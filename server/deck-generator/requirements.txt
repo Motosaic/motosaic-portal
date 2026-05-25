@@ -1,0 +1,9 @@
+# Python deps for the MotoMatch deck generator subprocess.
+# Installed at Render build time (see render.yaml buildCommand).
+python-pptx>=0.6.21
+Pillow>=10.0.0
+lxml>=4.9.0
+
+# pypdf is used by the Node Generate endpoint to extract text from PDF
+# attachments before passing them to Claude. Same Python env, one requirements.
+pypdf>=4.0.0

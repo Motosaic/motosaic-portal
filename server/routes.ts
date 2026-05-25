@@ -12,6 +12,8 @@ import { registerAuthRoutes, requireAdmin, requireClientOrAdmin } from "./auth";
 import { backupNow, getBackupStatus } from "./backup";
 import { checkQuota, recordUsage, getUsageStatus } from "./anthropic-quota";
 import { sqlite } from "./storage";
+import { generateDeck, resolveOutputPath } from "./deck-generator/generate";
+import { extractText } from "./deck-generator/extract";
 import os from "os";
 
 // ─── Supabase intelligence (env-var driven) ─────────────────────────────────
@@ -55,6 +57,20 @@ const upload = multer({
     const ext = (file.originalname || "").split(".").pop()?.toLowerCase();
     cb(null, allowed.includes(file.mimetype) || ext === "heic" || ext === "heif");
   },
+});
+
+// Deck attachments live in their own subdir so cleanup is tidy and the
+// upload route can be permissive (transcripts, notes, prior decks, etc.)
+// without polluting the document upload pool.
+const DECK_ATTACHMENTS_DIR = path.join(UPLOADS_DIR, "deck-attachments");
+if (!fs.existsSync(DECK_ATTACHMENTS_DIR)) {
+  fs.mkdirSync(DECK_ATTACHMENTS_DIR, { recursive: true });
+}
+const deckUpload = multer({
+  dest: DECK_ATTACHMENTS_DIR,
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB — same as document uploads
+  // No MIME filter — admin-only endpoint, operator uploads whatever they
+  // brought to the workspace.
 });
 
 // Fire-and-forget sheet sync helper (module-level so it can be called from anywhere in routes)
@@ -599,6 +615,300 @@ ${JSON.stringify(intelData, null, 2)}`;
       return res.status(500).json({ message: "Chat failed", error: String(err) });
     }
   });
+
+  // ─── Decks (MotoMatch deck generator) ────────────────────────────────────
+  // Top-level /decks workflow. Each draft is a workspace for building one
+  // deck: chat (persisted) + attachments + Generate. See PROJECT_STATE Phase 4
+  // and server/deck-generator/{house-style.md,generate.ts} for the design.
+
+  // Create a new draft for a client. Title auto-defaults if not provided.
+  app.post("/api/decks", requireAdmin, (req, res) => {
+    const parsed = z
+      .object({
+        clientId: z.number().int().positive(),
+        title: z.string().optional(),
+        createdBy: z.string().optional(),
+      })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ message: "Invalid payload", error: parsed.error.flatten() });
+    }
+    const client = storage.getClient(parsed.data.clientId);
+    if (!client) return res.status(404).json({ message: "Client not found" });
+
+    const defaultTitle = `Draft for ${client.firstName} ${client.lastName} — ${new Date().toLocaleDateString(
+      "en-US",
+      { month: "short", day: "numeric", year: "numeric" }
+    )}`;
+
+    const draft = storage.createDraft({
+      clientId: parsed.data.clientId,
+      title: parsed.data.title ?? defaultTitle,
+      status: "active",
+      createdBy: parsed.data.createdBy ?? "mike",
+    });
+    res.json(draft);
+  });
+
+  // List drafts. ?client=ID filters to one client; ?status=archived flips
+  // away from the default (active drafts only is too restrictive — return all
+  // by default and let the UI filter).
+  app.get("/api/decks", requireAdmin, (req, res) => {
+    const clientParam = req.query.client;
+    const statusParam = req.query.status;
+    const status =
+      typeof statusParam === "string" && statusParam.length > 0
+        ? statusParam
+        : undefined;
+
+    if (typeof clientParam === "string" && clientParam.length > 0) {
+      const clientId = parseInt(clientParam, 10);
+      if (!Number.isFinite(clientId)) {
+        return res.status(400).json({ message: "Invalid client id" });
+      }
+      return res.json(
+        storage.listDraftsByClient(clientId, status ? { status } : undefined)
+      );
+    }
+    return res.json(storage.listDrafts(status ? { status } : undefined));
+  });
+
+  // Get one draft with related rows hydrated.
+  app.get("/api/decks/:id", requireAdmin, (req, res) => {
+    const id = parseInt(String(req.params.id), 10);
+    const draft = storage.getDraft(id);
+    if (!draft) return res.status(404).json({ message: "Draft not found" });
+    const client = storage.getClient(draft.clientId);
+    const messages = storage.listMessagesByDraft(id);
+    const attachments = storage.listAttachmentsByDraft(id);
+    const outputs = storage.listOutputsByDraft(id);
+    res.json({ draft, client, messages, attachments, outputs });
+  });
+
+  // List messages for a draft (oldest first).
+  app.get("/api/decks/:id/messages", requireAdmin, (req, res) => {
+    const id = parseInt(String(req.params.id), 10);
+    const draft = storage.getDraft(id);
+    if (!draft) return res.status(404).json({ message: "Draft not found" });
+    res.json(storage.listMessagesByDraft(id));
+  });
+
+  // Append a message. Defaults to role=user. Role=assistant is allowed but
+  // typically only the Generate handler writes assistant rows.
+  app.post("/api/decks/:id/messages", requireAdmin, (req, res) => {
+    const id = parseInt(String(req.params.id), 10);
+    const draft = storage.getDraft(id);
+    if (!draft) return res.status(404).json({ message: "Draft not found" });
+
+    const parsed = z
+      .object({
+        content: z.string().min(1),
+        role: z.enum(["user", "assistant"]).default("user"),
+      })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ message: "Invalid payload", error: parsed.error.flatten() });
+    }
+    const msg = storage.createMessage({
+      draftId: id,
+      role: parsed.data.role,
+      content: parsed.data.content,
+    });
+    res.json(msg);
+  });
+
+  // Generate. Single-shot, no streaming — returns { output, assistantMessage }
+  // on success. On failure, appends the error as an assistant message so it
+  // shows up in chat (and re-throws via the HTTP error response).
+  app.post("/api/decks/:id/generate", requireAdmin, async (req, res) => {
+    const id = parseInt(String(req.params.id), 10);
+    const draft = storage.getDraft(id);
+    if (!draft) return res.status(404).json({ message: "Draft not found" });
+
+    try {
+      const result = await generateDeck(id);
+      return res.json(result);
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error(`[decks/generate] draft ${id}:`, errMsg);
+      // Surface the error into the chat so the operator sees what happened
+      try {
+        storage.createMessage({
+          draftId: id,
+          role: "assistant",
+          content: `Generate failed: ${errMsg.slice(0, 1500)}`,
+        });
+      } catch {
+        // best-effort
+      }
+      return res
+        .status(500)
+        .json({ message: "Generate failed", error: errMsg });
+    }
+  });
+
+  // Download a specific .pptx output. The chat assistant-message links here.
+  app.get(
+    "/api/decks/:draftId/outputs/:outputId/file",
+    requireAdmin,
+    (req, res) => {
+      const draftId = parseInt(String(req.params.draftId), 10);
+      const outputId = parseInt(String(req.params.outputId), 10);
+      const output = storage.getOutput(outputId);
+      if (!output || output.draftId !== draftId) {
+        return res.status(404).json({ message: "Output not found" });
+      }
+      const filePath = resolveOutputPath(output.filePath);
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ message: "File missing on disk" });
+      }
+      res.download(filePath);
+    }
+  );
+
+  // PATCH a draft — rename or change status (active/archived). Partial update.
+  app.patch("/api/decks/:id", requireAdmin, (req, res) => {
+    const id = parseInt(String(req.params.id), 10);
+    const draft = storage.getDraft(id);
+    if (!draft) return res.status(404).json({ message: "Draft not found" });
+
+    const parsed = z
+      .object({
+        title: z.string().min(1).optional(),
+        status: z.enum(["active", "archived"]).optional(),
+      })
+      .refine((d) => d.title !== undefined || d.status !== undefined, {
+        message: "Provide title or status",
+      })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ message: "Invalid payload", error: parsed.error.flatten() });
+    }
+
+    let updated = draft;
+    if (parsed.data.title !== undefined) {
+      updated = storage.updateDraftTitle(id, parsed.data.title) ?? updated;
+    }
+    if (parsed.data.status !== undefined) {
+      updated = storage.updateDraftStatus(id, parsed.data.status) ?? updated;
+    }
+    res.json(updated);
+  });
+
+  // DELETE a draft — cascade-removes messages, attachments, outputs and
+  // their on-disk files. Use only for genuine cleanup; for finished decks
+  // prefer archiving (PATCH status=archived) so the history is preserved.
+  app.delete("/api/decks/:id", requireAdmin, (req, res) => {
+    const id = parseInt(String(req.params.id), 10);
+    const draft = storage.getDraft(id);
+    if (!draft) return res.status(404).json({ message: "Draft not found" });
+
+    // Clean up files on disk before deleting DB rows (matches the existing
+    // deleteClient pattern in storage.ts — file cleanup is the route's job).
+    for (const att of storage.listAttachmentsByDraft(id)) {
+      const filePath = path.join(DECK_ATTACHMENTS_DIR, att.storedName);
+      try {
+        fs.unlinkSync(filePath);
+      } catch {
+        /* best-effort */
+      }
+    }
+    for (const out of storage.listOutputsByDraft(id)) {
+      const filePath = resolveOutputPath(out.filePath);
+      try {
+        fs.unlinkSync(filePath);
+      } catch {
+        /* best-effort */
+      }
+    }
+    storage.deleteDraft(id);
+    res.json({ ok: true });
+  });
+
+  // List attachments for a draft.
+  app.get("/api/decks/:id/attachments", requireAdmin, (req, res) => {
+    const id = parseInt(String(req.params.id), 10);
+    const draft = storage.getDraft(id);
+    if (!draft) return res.status(404).json({ message: "Draft not found" });
+    // Strip contentText from the list response to keep payloads small —
+    // the UI just needs metadata. Generate reads contentText directly from
+    // storage on the server side.
+    const atts = storage.listAttachmentsByDraft(id).map((a) => ({
+      id: a.id,
+      draftId: a.draftId,
+      filename: a.filename,
+      storedName: a.storedName,
+      mimeType: a.mimeType,
+      fileSize: a.fileSize,
+      hasContentText: Boolean(a.contentText && a.contentText.length > 0),
+      createdAt: a.createdAt,
+    }));
+    res.json(atts);
+  });
+
+  // Upload a new attachment. Single-file multipart/form-data, field name "file".
+  // Text extraction happens inline (PDFs → pypdf subprocess; .txt/.md → Node fs).
+  app.post(
+    "/api/decks/:id/attachments",
+    requireAdmin,
+    deckUpload.single("file"),
+    async (req, res) => {
+      const id = parseInt(String(req.params.id), 10);
+      const draft = storage.getDraft(id);
+      if (!draft) return res.status(404).json({ message: "Draft not found" });
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+
+      let contentText: string | null = null;
+      try {
+        contentText = await extractText(req.file.path, req.file.mimetype);
+      } catch (err) {
+        console.error("[decks/attachments] Extract failed:", err);
+      }
+
+      const att = storage.createAttachment({
+        draftId: id,
+        filename: req.file.originalname,
+        storedName: req.file.filename, // multer's hashed on-disk name
+        mimeType: req.file.mimetype,
+        fileSize: req.file.size,
+        contentText,
+      });
+      res.json({
+        ...att,
+        // Don't ship the full extracted text back to the client — could be huge
+        contentText: undefined,
+        hasContentText: Boolean(contentText && contentText.length > 0),
+      });
+    }
+  );
+
+  // Delete an attachment — cleans up the file on disk too.
+  app.delete(
+    "/api/decks/:draftId/attachments/:attachmentId",
+    requireAdmin,
+    (req, res) => {
+      const draftId = parseInt(String(req.params.draftId), 10);
+      const attachmentId = parseInt(String(req.params.attachmentId), 10);
+      const att = storage.getAttachment(attachmentId);
+      if (!att || att.draftId !== draftId) {
+        return res.status(404).json({ message: "Attachment not found" });
+      }
+      const filePath = path.join(DECK_ATTACHMENTS_DIR, att.storedName);
+      try {
+        fs.unlinkSync(filePath);
+      } catch {
+        /* best-effort */
+      }
+      storage.deleteAttachment(attachmentId);
+      res.json({ ok: true });
+    }
+  );
 
   // ─── Documents ──────────────────────────────────────────────────────────
 

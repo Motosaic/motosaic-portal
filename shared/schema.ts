@@ -115,3 +115,99 @@ export const insertDocumentSchema = createInsertSchema(documents).omit({
 });
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type Document = typeof documents.$inferSelect;
+
+// ─── Deck Drafts ───────────────────────────────────────────────────────────
+// A draft is a workspace for building one MotoMatch deck for a client.
+// Lives in the top-level /decks section of the portal. Holds chat + uploaded
+// attachments. Each Generate creates a new versioned row in deck_outputs.
+export const deckDrafts = sqliteTable("deck_drafts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  clientId: integer("client_id").notNull(),
+  title: text("title"), // optional human label; defaults derived at render time
+  status: text("status").default("active"), // "active" | "archived"
+  createdBy: text("created_by"), // free-text operator identifier (e.g. "mike", "lexi")
+  createdAt: text("created_at").default(new Date().toISOString()),
+  updatedAt: text("updated_at").default(new Date().toISOString()),
+});
+
+export const insertDeckDraftSchema = createInsertSchema(deckDrafts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertDeckDraft = z.infer<typeof insertDeckDraftSchema>;
+export type DeckDraft = typeof deckDrafts.$inferSelect;
+
+// ─── Deck Messages ─────────────────────────────────────────────────────────
+// Persistent chat history per draft. Read in full at Generate time so the
+// model re-derives current deck state from the conversation each call.
+export const deckMessages = sqliteTable("deck_messages", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  draftId: integer("draft_id").notNull(),
+  role: text("role").notNull(), // "user" | "assistant"
+  content: text("content").notNull(),
+  createdAt: text("created_at").default(new Date().toISOString()),
+});
+
+export const insertDeckMessageSchema = createInsertSchema(deckMessages).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertDeckMessage = z.infer<typeof insertDeckMessageSchema>;
+export type DeckMessage = typeof deckMessages.$inferSelect;
+
+// ─── Deck Attachments ──────────────────────────────────────────────────────
+// Files uploaded into a draft (call transcripts, notes, prior decks, etc.).
+// `contentText` is the extracted plaintext, stored once at upload time so
+// Generate doesn't re-extract on every call. Original file lives on disk
+// at `${UPLOADS_DIR}/deck-attachments/${storedName}`.
+// Note: the client's questionnaire is NOT an attachment — it's read live
+// from the `clients` table at Generate time so updates flow through.
+export const deckAttachments = sqliteTable("deck_attachments", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  draftId: integer("draft_id").notNull(),
+  filename: text("filename").notNull(), // original user-facing name
+  storedName: text("stored_name").notNull(), // sanitized on-disk name
+  mimeType: text("mime_type").notNull(),
+  fileSize: integer("file_size").notNull(),
+  contentText: text("content_text"), // null if extraction failed
+  createdAt: text("created_at").default(new Date().toISOString()),
+});
+
+export const insertDeckAttachmentSchema = createInsertSchema(deckAttachments).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertDeckAttachment = z.infer<typeof insertDeckAttachmentSchema>;
+export type DeckAttachment = typeof deckAttachments.$inferSelect;
+
+// ─── Deck Outputs ──────────────────────────────────────────────────────────
+// Every successful Generate creates a new versioned row. Old versions are
+// preserved for audit/diff. The .pptx lives on disk at
+// `${UPLOADS_DIR}/deck-outputs/${path}` and (optionally) on Google Drive.
+//
+// `compiledJson` is the JSON Claude produced before the Python renderer ran
+// — diffable across versions to see exactly what changed in selection or copy.
+// `houseStyleSnapshot` is the full text of house-style.md at gen time, so a
+// later edit to house-style can't silently change a regenerated deck.
+export const deckOutputs = sqliteTable("deck_outputs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  draftId: integer("draft_id").notNull(),
+  version: integer("version").notNull(), // 1-indexed, monotonic per draft
+  filePath: text("file_path").notNull(), // relative to UPLOADS_DIR/deck-outputs
+  driveFileId: text("drive_file_id"),
+  compiledJson: text("compiled_json").notNull(),
+  houseStyleSnapshot: text("house_style_snapshot").notNull(),
+  houseStyleCommit: text("house_style_commit"), // best-effort git SHA
+  modelUsed: text("model_used"),
+  tokensInput: integer("tokens_input"),
+  tokensOutput: integer("tokens_output"),
+  generatedAt: text("generated_at").default(new Date().toISOString()),
+});
+
+export const insertDeckOutputSchema = createInsertSchema(deckOutputs).omit({
+  id: true,
+  generatedAt: true,
+});
+export type InsertDeckOutput = z.infer<typeof insertDeckOutputSchema>;
+export type DeckOutput = typeof deckOutputs.$inferSelect;
