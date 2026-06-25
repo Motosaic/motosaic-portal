@@ -302,26 +302,41 @@ export async function generateQuestionnairePDF(client: Client): Promise<Buffer> 
     }
 
     // ── 7. Safety & Technology
-    const safetyTech = parseJson(c.safetyTechFeatures);
-    if (safetyTech.length > 0) {
+    // Saved as { mustHave: [...], niceToHave: [...] } — render each tier
+    // separately so Mike can see what's a non-negotiable vs a wishlist item.
+    const safetyTechRaw = (() => {
+      try { return JSON.parse(c.safetyTechFeatures || "{}"); } catch { return {}; }
+    })();
+    const safetyMust: string[] = Array.isArray(safetyTechRaw.mustHave) ? safetyTechRaw.mustHave : [];
+    const safetyNice: string[] = Array.isArray(safetyTechRaw.niceToHave) ? safetyTechRaw.niceToHave : [];
+    if (safetyMust.length > 0 || safetyNice.length > 0) {
       section("Safety & Technology");
-      row("Features", safetyTech.join(", "));
+      if (safetyMust.length > 0) row("Must Have", safetyMust.join(", "), true);
+      if (safetyNice.length > 0) row("Nice to Have", safetyNice.join(", "));
       divider();
     }
 
-    // ── 8. Comfort & Interior
-    const comfort = parseJson(c.comfortFeatures);
-    if (comfort.length > 0) {
+    // ── 8. Comfort & Interior — same tier structure as Safety
+    const comfortRaw = (() => {
+      try { return JSON.parse(c.comfortFeatures || "{}"); } catch { return {}; }
+    })();
+    const comfortMust: string[] = Array.isArray(comfortRaw.mustHave) ? comfortRaw.mustHave : [];
+    const comfortNice: string[] = Array.isArray(comfortRaw.niceToHave) ? comfortRaw.niceToHave : [];
+    if (comfortMust.length > 0 || comfortNice.length > 0) {
       section("Comfort & Interior");
-      row("Features", comfort.join(", "));
+      if (comfortMust.length > 0) row("Must Have", comfortMust.join(", "), true);
+      if (comfortNice.length > 0) row("Nice to Have", comfortNice.join(", "));
       divider();
     }
 
     // ── 9. Colors
+    // Both exterior and interior are stored as JSON arrays — parse before
+    // rendering so the PDF doesn't show raw `["Red","Blue"]` strings.
+    const extColors = parseJson(client.exteriorColors);
     const intColors = parseJson(client.interiorColors);
-    if (client.exteriorColors || intColors.length > 0) {
+    if (extColors.length > 0 || intColors.length > 0) {
       section("Colors");
-      if (client.exteriorColors) row("Exterior Colors", client.exteriorColors);
+      if (extColors.length > 0) row("Exterior Colors", extColors.join(", "));
       if (intColors.length > 0) row("Interior Colors", intColors.join(", "));
       divider();
     }
