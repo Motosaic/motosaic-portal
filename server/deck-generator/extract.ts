@@ -16,6 +16,7 @@
 import fs from "fs";
 import path from "path";
 import { spawn } from "child_process";
+import { PYTHON_BIN } from "./python-bin";
 
 const PDF_EXTRACT_PY = `
 import sys, pypdf
@@ -74,7 +75,7 @@ export async function extractText(
 
 function extractPdfText(filePath: string): Promise<string | null> {
   return new Promise((resolve) => {
-    const proc = spawn("python3", ["-c", PDF_EXTRACT_PY, filePath], {
+    const proc = spawn(PYTHON_BIN, ["-c", PDF_EXTRACT_PY, filePath], {
       stdio: ["ignore", "pipe", "pipe"],
     });
     let stdout = "";

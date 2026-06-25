@@ -16,6 +16,7 @@ import { spawn, execSync } from "child_process";
 import { z } from "zod";
 import { storage } from "../storage";
 import { checkQuota, recordUsage } from "../anthropic-quota";
+import { PYTHON_BIN } from "./python-bin";
 import type {
   Client,
   DeckAttachment,
@@ -438,7 +439,7 @@ function parseAndValidateLLMOutput(text: string): DeckLLMOutput {
 
 function runRender(configPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const proc = spawn("python3", [RENDER_PY, configPath], {
+    const proc = spawn(PYTHON_BIN, [RENDER_PY, configPath], {
       cwd: process.cwd(),
       stdio: ["ignore", "pipe", "pipe"],
     });
