@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MotoLogoFull } from "@/components/MotoLogo";
 import { useLocation, useParams } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -843,93 +843,89 @@ export default function IntakePage() {
     staleTime: 30000,
   });
 
-  // Pre-populate form from existing client record when first loaded
+  // Pre-populate form from existing client record. Runs once after the
+  // client query resolves. Uses a useEffect (not a render-side setState)
+  // so React's strict-mode double-render + autosave can't race against us
+  // and leave fields empty or chips unselected when the client returns to
+  // review their answers.
   const [namePrefilled, setNamePrefilled] = useState(false);
-  if (existingClient && !namePrefilled) {
+  useEffect(() => {
+    if (!existingClient || namePrefilled) return;
     const ec = existingClient as any;
     const tryParse = (v: string | null | undefined, fallback: unknown) => {
       try { return JSON.parse(v || ""); } catch { return fallback; }
     };
+    // Convert the saved chip format {mustHave:[...], niceToHave:[...]} back
+    // into the tri-state Record<string, 0|1|2> the form uses.
+    const restoreChipState = (saved: any): Record<string, 0|1|2> => {
+      const p = tryParse(saved, {});
+      const r: Record<string, 0|1|2> = {};
+      if (p && (p.mustHave || p.niceToHave)) {
+        (p.mustHave || []).forEach((k: string) => { r[k] = 2; });
+        (p.niceToHave || []).forEach((k: string) => { r[k] = 1; });
+      }
+      return r;
+    };
     setForm(prev => ({
       ...prev,
-      firstName: prev.firstName || ec.firstName || "",
-      lastName: prev.lastName || ec.lastName || "",
-      address: prev.address || ec.address || "",
-      city: prev.city || ec.city || "",
-      state: prev.state || ec.state || "",
-      zip: prev.zip || ec.zip || "",
+      firstName: ec.firstName || prev.firstName || "",
+      lastName: ec.lastName || prev.lastName || "",
+      address: ec.address || prev.address || "",
+      city: ec.city || prev.city || "",
+      state: ec.state || prev.state || "",
+      zip: ec.zip || prev.zip || "",
       // Step 2
-      purchaseType: prev.purchaseType || ec.purchaseType || "",
-      budget: prev.budget || ec.budget || "",
-      downPayment: prev.downPayment || ec.downPayment || "",
-      monthlyPayment: prev.monthlyPayment || ec.monthlyPayment || "",
-      creditScore: prev.creditScore || ec.creditScore || "",
-      timeframe: prev.timeframe || ec.timeframe || "",
-      annualMileage: prev.annualMileage || ec.annualMileage || "",
-      budgetPriorityStance: prev.budgetPriorityStance || ec.budgetPriorityStance || "",
+      purchaseType: ec.purchaseType || prev.purchaseType || "",
+      budget: ec.budget || prev.budget || "",
+      downPayment: ec.downPayment || prev.downPayment || "",
+      monthlyPayment: ec.monthlyPayment || prev.monthlyPayment || "",
+      creditScore: ec.creditScore || prev.creditScore || "",
+      timeframe: ec.timeframe || prev.timeframe || "",
+      annualMileage: ec.annualMileage || prev.annualMileage || "",
+      budgetPriorityStance: ec.budgetPriorityStance || prev.budgetPriorityStance || "",
       // Step 3
-      primaryUseCases: prev.primaryUseCases.length > 0 ? prev.primaryUseCases : tryParse(ec.primaryUseCases, []),
-      specialUseCases: prev.specialUseCases || ec.specialUseCases || "",
-      bodyStyles: prev.bodyStyles.length > 0 ? prev.bodyStyles : tryParse(ec.bodyStyles, []),
-      passengerRequirement: prev.passengerRequirement || ec.passengerRequirement || ec.passengerCount || "",
-      childrenRiding: prev.childrenRiding || (ec.childrenInVehicle && ec.childrenInVehicle !== "[]" ? "yes" : ""),
-      childrenInVehicle: prev.childrenInVehicle.length > 0 ? prev.childrenInVehicle : tryParse(ec.childrenInVehicle, []),
-      dogSpace: prev.dogSpace || ec.dogSpace || "",
-      thirdRowUsage: prev.thirdRowUsage || ec.thirdRowUsage || "",
-      secondRowPreference: prev.secondRowPreference || ec.secondRowPreference || ec.suvSeatConfig || "",
-      powertrain: prev.powertrain.length > 0 ? prev.powertrain : tryParse(ec.powertrain, ec.powertrain ? [ec.powertrain] : []),
-      homeCharging: prev.homeCharging || ec.homeCharging || "",
-      safetyTechFeatures: Object.keys(prev.safetyTechFeatures).length > 0 ? prev.safetyTechFeatures : (() => {
-        const p = tryParse(ec.safetyTechFeatures, {});
-        if (p.mustHave || p.niceToHave) {
-          const r: Record<string, 0|1|2> = {};
-          (p.mustHave || []).forEach((k: string) => { r[k] = 2; });
-          (p.niceToHave || []).forEach((k: string) => { r[k] = 1; });
-          return r;
-        }
-        return {};
-      })(),
-      comfortFeatures: Object.keys(prev.comfortFeatures).length > 0 ? prev.comfortFeatures : (() => {
-        const p = tryParse(ec.comfortFeatures, {});
-        if (p.mustHave || p.niceToHave) {
-          const r: Record<string, 0|1|2> = {};
-          (p.mustHave || []).forEach((k: string) => { r[k] = 2; });
-          (p.niceToHave || []).forEach((k: string) => { r[k] = 1; });
-          return r;
-        }
-        return {};
-      })(),
-      exteriorColors: prev.exteriorColors.length > 0 ? prev.exteriorColors : tryParse(ec.exteriorColors, []),
-      interiorColors: prev.interiorColors.length > 0 ? prev.interiorColors : tryParse(ec.interiorColors, []),
-      additionalNotes: prev.additionalNotes || ec.additionalNotes || ec.mustHaveFeatures || "",
-      costcoMembership: prev.costcoMembership || ec.costcoMembership || "",
-      isVeteran: prev.isVeteran || ec.isVeteran || "",
-      householdVehicles: prev.householdVehicles.length > 0 ? prev.householdVehicles : tryParse(ec.householdVehicles, []),
+      primaryUseCases: tryParse(ec.primaryUseCases, prev.primaryUseCases) as string[],
+      specialUseCases: ec.specialUseCases || prev.specialUseCases || "",
+      bodyStyles: tryParse(ec.bodyStyles, prev.bodyStyles) as string[],
+      passengerRequirement: ec.passengerRequirement || ec.passengerCount || prev.passengerRequirement || "",
+      childrenRiding: ec.childrenInVehicle && ec.childrenInVehicle !== "[]" ? "yes" : prev.childrenRiding || "",
+      childrenInVehicle: tryParse(ec.childrenInVehicle, prev.childrenInVehicle) as any[],
+      dogSpace: ec.dogSpace || prev.dogSpace || "",
+      thirdRowUsage: ec.thirdRowUsage || prev.thirdRowUsage || "",
+      secondRowPreference: ec.secondRowPreference || ec.suvSeatConfig || prev.secondRowPreference || "",
+      powertrain: tryParse(ec.powertrain, ec.powertrain ? [ec.powertrain] : prev.powertrain) as string[],
+      homeCharging: ec.homeCharging || prev.homeCharging || "",
+      safetyTechFeatures: restoreChipState(ec.safetyTechFeatures),
+      comfortFeatures: restoreChipState(ec.comfortFeatures),
+      exteriorColors: tryParse(ec.exteriorColors, prev.exteriorColors) as string[],
+      interiorColors: tryParse(ec.interiorColors, prev.interiorColors) as string[],
+      additionalNotes: ec.additionalNotes || ec.mustHaveFeatures || prev.additionalNotes || "",
+      costcoMembership: ec.costcoMembership || prev.costcoMembership || "",
+      isVeteran: ec.isVeteran || prev.isVeteran || "",
+      householdVehicles: tryParse(ec.householdVehicles, prev.householdVehicles) as any[],
       // Step 4 trade-in
-      hasTradeIn: prev.hasTradeIn || ec.hasTradeIn || "",
-      tradeYear: prev.tradeYear || ec.tradeYear || "",
-      tradeMake: prev.tradeMake || ec.tradeMake || "",
-      tradeModel: prev.tradeModel || ec.tradeModel || "",
-      tradeTrim: prev.tradeTrim || ec.tradeTrim || "",
-      tradeMileage: prev.tradeMileage || ec.tradeMileage || "",
-      tradeCondition: prev.tradeCondition || ec.tradeCondition || "",
-      tradeOwed: prev.tradeOwed || ec.tradeOwed || "",
+      hasTradeIn: ec.hasTradeIn || prev.hasTradeIn || "",
+      tradeYear: ec.tradeYear || prev.tradeYear || "",
+      tradeMake: ec.tradeMake || prev.tradeMake || "",
+      tradeModel: ec.tradeModel || prev.tradeModel || "",
+      tradeTrim: ec.tradeTrim || prev.tradeTrim || "",
+      tradeMileage: ec.tradeMileage || prev.tradeMileage || "",
+      tradeCondition: ec.tradeCondition || prev.tradeCondition || "",
+      tradeOwed: ec.tradeOwed || prev.tradeOwed || "",
       // Step 5 priorities
-      priorityRankings: Object.keys(prev.priorityRankings).length === 0
-        ? tryParse(ec.priorityRankings, {})
-        : prev.priorityRankings,
+      priorityRankings: tryParse(ec.priorityRankings, prev.priorityRankings) as Record<string, any>,
     }));
     // Restore makes state
     if (ec.preferredMakes || ec.notInterestedMakes) {
-      const pref: string[] = tryParse(ec.preferredMakes, []);
-      const notInt: string[] = tryParse(ec.notInterestedMakes, []);
+      const pref: string[] = tryParse(ec.preferredMakes, []) as string[];
+      const notInt: string[] = tryParse(ec.notInterestedMakes, []) as string[];
       const ms: MakeState = {};
       pref.forEach((m: string) => { ms[m] = 1; });
       notInt.forEach((m: string) => { ms[m] = -1; });
       setMakesState(ms);
     }
     setNamePrefilled(true);
-  }
+  }, [existingClient, namePrefilled]);
 
   // Real-time autosave — debounced 1.5s after any chip/toggle change
   const [saveTimer, setSaveTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
