@@ -914,8 +914,24 @@ export default function ClientDetailPage() {
   })();
   // New questionnaire fields
   const primaryUseCases: string[] = parseJson((client as any).primaryUseCases);
-  const safetyTechFeatures: string[] = parseJson((client as any).safetyTechFeatures);
-  const comfortFeatures: string[] = parseJson((client as any).comfortFeatures);
+  // Chip features are saved as { mustHave:[...], niceToHave:[...] } — split
+  // them so the detail page can show the tier distinction at a glance.
+  const parseChipFeatures = (raw: unknown): { mustHave: string[]; niceToHave: string[] } => {
+    try {
+      const p = JSON.parse((raw as string) || "{}");
+      return {
+        mustHave: Array.isArray(p?.mustHave) ? p.mustHave : [],
+        niceToHave: Array.isArray(p?.niceToHave) ? p.niceToHave : [],
+      };
+    } catch {
+      return { mustHave: [], niceToHave: [] };
+    }
+  };
+  const safetyTech = parseChipFeatures((client as any).safetyTechFeatures);
+  const comfort = parseChipFeatures((client as any).comfortFeatures);
+  // Exterior colors are saved as a JSON array — parse before rendering so
+  // the UI doesn't show raw ["Red","Blue"].
+  const extColors = parseJson(client.exteriorColors);
   const childrenInVehicle: Array<{ age: string; seatType: string }> = (() => {
     try { return JSON.parse((client as any).childrenInVehicle || "[]"); } catch { return []; }
   })();
@@ -1363,28 +1379,54 @@ export default function ClientDetailPage() {
                   )}
 
                   {/* Safety & Tech */}
-                  {safetyTechFeatures.length > 0 && (
+                  {(safetyTech.mustHave.length > 0 || safetyTech.niceToHave.length > 0) && (
                     <div>
                       <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.78)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Safety & Tech</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {safetyTechFeatures.map((s: string) => <Pill key={s} label={s} />)}
-                      </div>
+                      {safetyTech.mustHave.length > 0 && (
+                        <div style={{ marginBottom: 6 }}>
+                          <p style={{ fontSize: 10, color: "var(--miami-blue)", marginBottom: 4, fontWeight: 600 }}>Must have</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {safetyTech.mustHave.map((s: string) => <Pill key={s} label={s} />)}
+                          </div>
+                        </div>
+                      )}
+                      {safetyTech.niceToHave.length > 0 && (
+                        <div>
+                          <p style={{ fontSize: 10, color: "rgba(255,255,255,0.55)", marginBottom: 4, fontWeight: 600 }}>Nice to have</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {safetyTech.niceToHave.map((s: string) => <Pill key={s} label={s} />)}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
                   {/* Comfort */}
-                  {comfortFeatures.length > 0 && (
+                  {(comfort.mustHave.length > 0 || comfort.niceToHave.length > 0) && (
                     <div>
                       <p style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.78)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Comfort</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {comfortFeatures.map((s: string) => <Pill key={s} label={s} />)}
-                      </div>
+                      {comfort.mustHave.length > 0 && (
+                        <div style={{ marginBottom: 6 }}>
+                          <p style={{ fontSize: 10, color: "var(--miami-blue)", marginBottom: 4, fontWeight: 600 }}>Must have</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {comfort.mustHave.map((s: string) => <Pill key={s} label={s} />)}
+                          </div>
+                        </div>
+                      )}
+                      {comfort.niceToHave.length > 0 && (
+                        <div>
+                          <p style={{ fontSize: 10, color: "rgba(255,255,255,0.55)", marginBottom: 4, fontWeight: 600 }}>Nice to have</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {comfort.niceToHave.map((s: string) => <Pill key={s} label={s} />)}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
                   {/* Colors */}
-                  {client.exteriorColors && (
-                    <Row label="Ext Color" value={client.exteriorColors} />
+                  {extColors.length > 0 && (
+                    <Row label="Ext Color" value={extColors.join(", ")} />
                   )}
                   {intColors.length > 0 && (
                     <Row label="Int Color" value={intColors.join(", ")} />
