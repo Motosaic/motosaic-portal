@@ -998,7 +998,11 @@ ${JSON.stringify(intelData, null, 2)}`;
 
       let contentText: string | null = null;
       try {
-        contentText = await extractText(req.file.path, req.file.mimetype);
+        contentText = await extractText(
+          req.file.path,
+          req.file.mimetype,
+          req.file.originalname
+        );
       } catch (err) {
         console.error("[decks/attachments] Extract failed:", err);
       }

@@ -31,12 +31,20 @@ sys.stdout.write("".join(parts))
 /**
  * Returns extracted text, or null if extraction isn't supported or failed.
  * Never throws.
+ *
+ * Pass `originalName` whenever you have it (multer renames uploads to a
+ * random hash on disk with no extension, so the on-disk path can't be
+ * used for extension sniffing).
  */
 export async function extractText(
   filePath: string,
-  mimeType: string
+  mimeType: string,
+  originalName?: string
 ): Promise<string | null> {
-  const ext = path.extname(filePath).toLowerCase();
+  // Prefer the original filename's extension — multer's hashed on-disk
+  // name has no extension at all, so falling back to filePath made every
+  // .txt/.md upload look extension-less.
+  const ext = (originalName ? path.extname(originalName) : path.extname(filePath)).toLowerCase();
 
   // PDFs: spawn python + pypdf
   if (mimeType === "application/pdf" || ext === ".pdf") {
