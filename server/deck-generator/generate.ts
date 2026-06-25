@@ -21,6 +21,7 @@ import type {
   DeckAttachment,
   DeckMessage,
   DeckOutput,
+  DeckVehicle,
 } from "@shared/schema";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -104,6 +105,7 @@ export async function generateDeck(draftId: number): Promise<GenerateResult> {
   if (!client) throw new Error(`Client ${draft.clientId} not found`);
   const messages = storage.listMessagesByDraft(draftId);
   const attachments = storage.listAttachmentsByDraft(draftId);
+  const existingVehicles = storage.listVehiclesByDraft(draftId);
 
   // 2. Read house-style.md + best-effort git SHA
   if (!fs.existsSync(HOUSE_STYLE_PATH)) {
@@ -123,6 +125,7 @@ export async function generateDeck(draftId: number): Promise<GenerateResult> {
     client,
     messages,
     attachments,
+    requiredVehicles: existingVehicles,
     instruction:
       latestUserInstruction(messages) ?? "Generate the initial deck draft.",
   });
@@ -214,6 +217,22 @@ export async function generateDeck(draftId: number): Promise<GenerateResult> {
     tokensOutput: outputTokens,
   });
 
+  // 11b. Sync the vehicles table when the list was empty — Claude's
+  // proposal becomes the working list the operator then edits. If the
+  // list was already populated, we leave it alone (Claude was told to
+  // use it as-is, so it should match anyway).
+  if (existingVehicles.length === 0) {
+    storage.replaceAllVehicles(
+      draftId,
+      compiledJson.vehicles.map((v) => ({
+        key: v.key,
+        yearMakeModel: v.year_make_model,
+        msrp: v.msrp ?? null,
+        source: "llm" as const,
+      }))
+    );
+  }
+
   // 12. Append assistant message with download link
   const slideCount =
     2 +
@@ -244,9 +263,10 @@ function buildUserPayload(input: {
   client: Client;
   messages: DeckMessage[];
   attachments: DeckAttachment[];
+  requiredVehicles: DeckVehicle[];
   instruction: string;
 }): string {
-  const { client, messages, attachments, instruction } = input;
+  const { client, messages, attachments, requiredVehicles, instruction } = input;
   const sections: string[] = [];
 
   // Anchor the model on a real date — without this it picks something from
@@ -254,6 +274,19 @@ function buildUserPayload(input: {
   sections.push("=== DECK DATE ===");
   sections.push(currentMonthYear());
   sections.push("");
+
+  // If the operator has curated a vehicles list (via the workspace UI or
+  // from a prior Generate), it's authoritative. Claude writes copy against
+  // these exact picks in this order — no selection autonomy.
+  if (requiredVehicles.length > 0) {
+    sections.push("=== REQUIRED VEHICLES (use exactly these, in this order) ===");
+    requiredVehicles.forEach((v) => {
+      sections.push(
+        `${v.position}. ${v.yearMakeModel}${v.msrp ? ` (${v.msrp})` : ""} [key: ${v.key}]`
+      );
+    });
+    sections.push("");
+  }
 
   sections.push("=== CLIENT QUESTIONNAIRE ===");
   sections.push(JSON.stringify(clientSummary(client), null, 2));

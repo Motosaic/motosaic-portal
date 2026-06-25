@@ -111,6 +111,18 @@ sqlite.exec(`
   CREATE INDEX IF NOT EXISTS idx_deck_attachments_draft ON deck_attachments(draft_id);
   CREATE INDEX IF NOT EXISTS idx_deck_outputs_draft ON deck_outputs(draft_id, version DESC);
 
+  CREATE TABLE IF NOT EXISTS deck_vehicles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    draft_id INTEGER NOT NULL,
+    position INTEGER NOT NULL,
+    key TEXT NOT NULL,
+    year_make_model TEXT NOT NULL,
+    msrp TEXT,
+    source TEXT DEFAULT 'llm',
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_deck_vehicles_draft ON deck_vehicles(draft_id, position);
+
   CREATE TABLE IF NOT EXISTS client_transcripts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     client_id INTEGER,
@@ -228,6 +240,13 @@ export interface IStorage {
   getOutput(id: number): schema.DeckOutput | undefined;
   createOutput(data: schema.InsertDeckOutput): schema.DeckOutput;
   nextVersionForDraft(draftId: number): number;
+  // Deck vehicles (stateful working list)
+  listVehiclesByDraft(draftId: number): schema.DeckVehicle[];
+  getVehicle(id: number): schema.DeckVehicle | undefined;
+  addVehicle(data: Omit<schema.InsertDeckVehicle, "position">): schema.DeckVehicle;
+  deleteVehicle(id: number): void;
+  moveVehicle(id: number, direction: "up" | "down"): schema.DeckVehicle | undefined;
+  replaceAllVehicles(draftId: number, vehicles: Array<Omit<schema.InsertDeckVehicle, "draftId" | "position">>): void;
   // Client transcripts
   listTranscriptsByClient(clientId: number): schema.ClientTranscript[];
   listUnattachedTranscripts(): schema.ClientTranscript[];
@@ -534,6 +553,104 @@ export class Storage implements IStorage {
       .limit(1)
       .get();
     return (latest?.version ?? 0) + 1;
+  }
+
+  // ─── Deck vehicles ───────────────────────────────────────────────────────
+  listVehiclesByDraft(draftId: number): schema.DeckVehicle[] {
+    return db
+      .select()
+      .from(schema.deckVehicles)
+      .where(eq(schema.deckVehicles.draftId, draftId))
+      .orderBy(asc(schema.deckVehicles.position))
+      .all();
+  }
+
+  getVehicle(id: number): schema.DeckVehicle | undefined {
+    return db.select().from(schema.deckVehicles).where(eq(schema.deckVehicles.id, id)).get();
+  }
+
+  addVehicle(data: Omit<schema.InsertDeckVehicle, "position">): schema.DeckVehicle {
+    const max = db
+      .select()
+      .from(schema.deckVehicles)
+      .where(eq(schema.deckVehicles.draftId, data.draftId))
+      .orderBy(desc(schema.deckVehicles.position))
+      .limit(1)
+      .get();
+    const nextPos = (max?.position ?? 0) + 1;
+    const row = db
+      .insert(schema.deckVehicles)
+      .values({ ...data, position: nextPos })
+      .returning()
+      .get();
+    this.touchDraft(data.draftId);
+    return row;
+  }
+
+  deleteVehicle(id: number): void {
+    const v = this.getVehicle(id);
+    if (!v) return;
+    db.delete(schema.deckVehicles).where(eq(schema.deckVehicles.id, id)).run();
+    // Compact positions: shift everyone after the deleted row up by one.
+    db.update(schema.deckVehicles)
+      .set({ position: sql`position - 1` as any })
+      .where(
+        and(
+          eq(schema.deckVehicles.draftId, v.draftId),
+          sql`position > ${v.position}` as any
+        )
+      )
+      .run();
+    this.touchDraft(v.draftId);
+  }
+
+  moveVehicle(id: number, direction: "up" | "down"): schema.DeckVehicle | undefined {
+    const v = this.getVehicle(id);
+    if (!v) return undefined;
+    const targetPos = direction === "up" ? v.position - 1 : v.position + 1;
+    if (targetPos < 1) return v;
+    const neighbor = db
+      .select()
+      .from(schema.deckVehicles)
+      .where(
+        and(
+          eq(schema.deckVehicles.draftId, v.draftId),
+          eq(schema.deckVehicles.position, targetPos)
+        )
+      )
+      .get();
+    if (!neighbor) return v;
+
+    // Three-step swap through a sentinel slot to avoid transient duplicates.
+    db.update(schema.deckVehicles)
+      .set({ position: -1 })
+      .where(eq(schema.deckVehicles.id, v.id))
+      .run();
+    db.update(schema.deckVehicles)
+      .set({ position: v.position })
+      .where(eq(schema.deckVehicles.id, neighbor.id))
+      .run();
+    db.update(schema.deckVehicles)
+      .set({ position: targetPos })
+      .where(eq(schema.deckVehicles.id, v.id))
+      .run();
+    this.touchDraft(v.draftId);
+    return this.getVehicle(id);
+  }
+
+  // Used after a successful Generate when the list was empty — populates it
+  // with whatever Claude proposed. Wipes any prior rows for the draft.
+  replaceAllVehicles(
+    draftId: number,
+    vehicles: Array<Omit<schema.InsertDeckVehicle, "draftId" | "position">>
+  ): void {
+    db.delete(schema.deckVehicles).where(eq(schema.deckVehicles.draftId, draftId)).run();
+    vehicles.forEach((v, i) => {
+      db.insert(schema.deckVehicles)
+        .values({ ...v, draftId, position: i + 1 })
+        .run();
+    });
+    this.touchDraft(draftId);
   }
 
   // ─── Client transcripts ──────────────────────────────────────────────────

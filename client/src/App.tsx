@@ -10,6 +10,8 @@ import IntakePage from "@/pages/IntakePage";
 import UploadPage from "@/pages/UploadPage";
 import AdminDashboard from "@/pages/AdminDashboard";
 import ClientDetailPage from "@/pages/ClientDetailPage";
+import DecksListPage from "@/pages/DecksListPage";
+import DeckWorkspacePage from "@/pages/DeckWorkspacePage";
 import LandingPage from "@/pages/LandingPage";
 import NotFound from "@/pages/not-found";
 
@@ -36,6 +38,10 @@ function AppRoutes() {
         {/* Admin */}
         <Route path="/admin" component={AdminDashboard} />
         <Route path="/admin/clients/:id" component={ClientDetailPage} />
+
+        {/* Decks — MotoMatch deck generator workspace */}
+        <Route path="/decks" component={DecksListPage} />
+        <Route path="/decks/:id" component={DeckWorkspacePage} />
 
         <Route component={NotFound} />
       </Switch>

@@ -14,6 +14,7 @@ import { checkQuota, recordUsage, getUsageStatus } from "./anthropic-quota";
 import { sqlite } from "./storage";
 import { generateDeck, resolveOutputPath } from "./deck-generator/generate";
 import { extractText } from "./deck-generator/extract";
+import { parseVehicle } from "./deck-generator/parse-vehicle";
 import {
   verifyWebhookSignature as verifyZoomSignature,
   buildUrlValidationResponse as buildZoomUrlValidationResponse,
@@ -814,7 +815,8 @@ ${JSON.stringify(intelData, null, 2)}`;
     const messages = storage.listMessagesByDraft(id);
     const attachments = storage.listAttachmentsByDraft(id);
     const outputs = storage.listOutputsByDraft(id);
-    res.json({ draft, client, messages, attachments, outputs });
+    const vehicles = storage.listVehiclesByDraft(id);
+    res.json({ draft, client, messages, attachments, outputs, vehicles });
   });
 
   // List messages for a draft (oldest first).
@@ -1015,6 +1017,114 @@ ${JSON.stringify(intelData, null, 2)}`;
         contentText: undefined,
         hasContentText: Boolean(contentText && contentText.length > 0),
       });
+    }
+  );
+
+  // ─── Deck vehicles (stateful working list) ────────────────────────────────
+  // The vehicles list survives across Generates and is the operator's primary
+  // organizing surface. Edits queue up — they only apply to a new .pptx when
+  // Generate is clicked.
+
+  app.get("/api/decks/:id/vehicles", requireAdmin, (req, res) => {
+    const id = parseInt(String(req.params.id), 10);
+    const draft = storage.getDraft(id);
+    if (!draft) return res.status(404).json({ message: "Draft not found" });
+    res.json(storage.listVehiclesByDraft(id));
+  });
+
+  // Manual add. Body matches what the parse endpoint returns, so the UI can
+  // pipe parse → add directly after operator confirmation.
+  app.post("/api/decks/:id/vehicles", requireAdmin, (req, res) => {
+    const id = parseInt(String(req.params.id), 10);
+    const draft = storage.getDraft(id);
+    if (!draft) return res.status(404).json({ message: "Draft not found" });
+
+    const parsed = z
+      .object({
+        year_make_model: z.string().min(1),
+        msrp: z.string().optional().nullable(),
+        key: z
+          .string()
+          .min(1)
+          .regex(/^[a-z0-9_]+$/, "key must be snake_case"),
+        source: z.enum(["llm", "manual"]).default("manual"),
+      })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ message: "Invalid payload", error: parsed.error.flatten() });
+    }
+    const v = storage.addVehicle({
+      draftId: id,
+      key: parsed.data.key,
+      yearMakeModel: parsed.data.year_make_model,
+      msrp: parsed.data.msrp ?? null,
+      source: parsed.data.source,
+    });
+    res.json(v);
+  });
+
+  // Parse plain-English text into a suggested vehicle. Used by the "+ Add"
+  // input — operator types "Cadillac CT5", server returns
+  // "2026 Cadillac CT5 Premium Luxury, $48-58K" for confirmation before adding.
+  app.post("/api/decks/:id/vehicles/parse", requireAdmin, async (req, res) => {
+    const id = parseInt(String(req.params.id), 10);
+    const draft = storage.getDraft(id);
+    if (!draft) return res.status(404).json({ message: "Draft not found" });
+
+    const parsed = z
+      .object({ text: z.string().min(1).max(500) })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Missing text" });
+    }
+    try {
+      const suggestion = await parseVehicle(parsed.data.text);
+      res.json(suggestion);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[decks/vehicles/parse]", msg);
+      res.status(400).json({ message: msg });
+    }
+  });
+
+  // Move a vehicle up/down in the deck order. Body: { direction: "up"|"down" }
+  app.patch(
+    "/api/decks/:draftId/vehicles/:vehicleId",
+    requireAdmin,
+    (req, res) => {
+      const draftId = parseInt(String(req.params.draftId), 10);
+      const vehicleId = parseInt(String(req.params.vehicleId), 10);
+      const v = storage.getVehicle(vehicleId);
+      if (!v || v.draftId !== draftId) {
+        return res.status(404).json({ message: "Vehicle not found" });
+      }
+      const parsed = z
+        .object({ direction: z.enum(["up", "down"]) })
+        .safeParse(req.body);
+      if (!parsed.success) {
+        return res
+          .status(400)
+          .json({ message: "Provide direction: 'up' or 'down'" });
+      }
+      const updated = storage.moveVehicle(vehicleId, parsed.data.direction);
+      res.json(updated);
+    }
+  );
+
+  app.delete(
+    "/api/decks/:draftId/vehicles/:vehicleId",
+    requireAdmin,
+    (req, res) => {
+      const draftId = parseInt(String(req.params.draftId), 10);
+      const vehicleId = parseInt(String(req.params.vehicleId), 10);
+      const v = storage.getVehicle(vehicleId);
+      if (!v || v.draftId !== draftId) {
+        return res.status(404).json({ message: "Vehicle not found" });
+      }
+      storage.deleteVehicle(vehicleId);
+      res.json({ ok: true });
     }
   );
 

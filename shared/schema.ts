@@ -216,6 +216,31 @@ export const insertDeckOutputSchema = createInsertSchema(deckOutputs).omit({
 export type InsertDeckOutput = z.infer<typeof insertDeckOutputSchema>;
 export type DeckOutput = typeof deckOutputs.$inferSelect;
 
+// ─── Deck Vehicles ─────────────────────────────────────────────────────────
+// Stateful, per-draft working list of vehicles being considered.
+// - On first Generate, populated automatically from Claude's proposal.
+// - Operator edits (add/delete/reorder) survive across Generates.
+// - Subsequent Generates use this list as the authoritative selection —
+//   Claude only writes blurbs/why/considerations, doesn't pick vehicles.
+// position is 1-indexed and contiguous; storage methods keep it tight.
+export const deckVehicles = sqliteTable("deck_vehicles", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  draftId: integer("draft_id").notNull(),
+  position: integer("position").notNull(),
+  key: text("key").notNull(), // snake_case match for python-pptx
+  yearMakeModel: text("year_make_model").notNull(),
+  msrp: text("msrp"),
+  source: text("source").default("llm"), // "llm" | "manual"
+  createdAt: text("created_at").default(new Date().toISOString()),
+});
+
+export const insertDeckVehicleSchema = createInsertSchema(deckVehicles).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertDeckVehicle = z.infer<typeof insertDeckVehicleSchema>;
+export type DeckVehicle = typeof deckVehicles.$inferSelect;
+
 // ─── Client Transcripts ────────────────────────────────────────────────────
 // Discovery-call (and follow-up) transcripts. Ingested via the Zoom webhook
 // (recording.transcript_completed), parsed from VTT into plain text, and
