@@ -72,14 +72,14 @@ export default function DecksListPage() {
 
   if (authLoading || !authStatus?.authenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "#f8fafc" }}>
+      <div className="light-portal min-h-screen flex items-center justify-center" style={{ background: "#f8fafc" }}>
         <p style={{ fontSize: 18, fontWeight: 700, color: "var(--shelby-blue)" }}>Checking auth…</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen" style={{ background: "#f8fafc" }}>
+    <div className="light-portal min-h-screen" style={{ background: "#f8fafc" }}>
       <Header />
       <main className="max-w-5xl mx-auto px-4 py-6 space-y-4">
         <div className="flex items-center justify-between gap-4 flex-wrap">

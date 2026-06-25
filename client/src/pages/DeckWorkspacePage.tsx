@@ -85,7 +85,7 @@ export default function DeckWorkspacePage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: "#f1f5f9" }}>
+    <div className="light-portal min-h-screen" style={{ background: "#f1f5f9" }}>
       <Header draft={data.draft} client={data.client} />
       <main className="max-w-5xl mx-auto px-4 py-6 space-y-6 pb-32">
         <ClientSummaryCard client={data.client} />
@@ -101,7 +101,7 @@ export default function DeckWorkspacePage() {
 
 function ShellMessage({ title, body }: { title: string; body?: string }) {
   return (
-    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "#f1f5f9" }}>
+    <div className="light-portal min-h-screen flex items-center justify-center px-4" style={{ background: "#f1f5f9" }}>
       <div className="text-center">
         <p style={{ fontSize: 20, fontWeight: 700, color: "var(--shelby-blue)" }}>{title}</p>
         {body && <p style={{ fontSize: 14, color: TEXT_MUTED, marginTop: 8 }}>{body}</p>}
