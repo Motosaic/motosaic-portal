@@ -3,7 +3,10 @@ services:
     name: motosaic-portal
     runtime: node
     plan: starter
-    buildCommand: pip3 install --target=./python-deps -r server/deck-generator/requirements.txt && npm install && npm run build
+    # npm install first so node_modules exists, then drop Python deps inside
+    # it (Render's buildpack guarantees node_modules persists into runtime —
+    # arbitrary top-level dirs like ./python-deps did not). Then build.
+    buildCommand: npm install && pip3 install --target=./node_modules/.python-deps -r server/deck-generator/requirements.txt && npm run build
     startCommand: npm start
     disk:
       name: motosaic-data

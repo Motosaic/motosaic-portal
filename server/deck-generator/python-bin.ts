@@ -2,13 +2,18 @@
  * Resolves the Python interpreter + dependencies path for deck rendering
  * and PDF extraction.
  *
- * On Render the build step installs deps via `pip install --target=./python-deps`
- * (avoids relying on `python3 -m venv`, which isn't available on every base
- * image, and avoids `--user` whose site-packages dir isn't visible to the
- * runtime in some configurations). At spawn time we set PYTHONPATH to that
- * directory so `import pptx` resolves.
+ * On Render the build step installs deps into ./node_modules/.python-deps
+ * (chosen because Render's buildpack guarantees node_modules persists into
+ * runtime — earlier attempts at ./python-deps and ./.venv vanished between
+ * build and runtime). At spawn time we set PYTHONPATH to that directory
+ * so `import pptx` resolves.
  *
- * Locally, ./python-deps usually doesn't exist; we fall back to system
+ * The directory-exists check happens at spawn time, not module load, so
+ * a manual `pip install --target=./node_modules/.python-deps ...` from
+ * the Render Shell takes effect on the very next Generate without
+ * needing a server restart.
+ *
+ * Locally, the directory usually doesn't exist; we fall back to system
  * python3 and whatever the dev has installed via pip3 --user.
  */
 
@@ -21,34 +26,51 @@ import {
 } from "child_process";
 import type { Readable } from "stream";
 
-const PYTHON_DEPS = path.resolve(process.cwd(), "python-deps");
-const venvPython = path.resolve(process.cwd(), ".venv", "bin", "python3");
+// Canonical locations to check, in order. We pick the first one that exists.
+function resolveDepsDir(): string | null {
+  const candidates = [
+    path.resolve(process.cwd(), "node_modules", ".python-deps"),
+    // Legacy locations we used briefly — still honored so a manual install
+    // in either spot keeps working.
+    path.resolve(process.cwd(), "python-deps"),
+    path.resolve(process.cwd(), ".venv", "lib", "python3.11", "site-packages"),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  return null;
+}
 
-export const PYTHON_BIN = fs.existsSync(venvPython) ? venvPython : "python3";
-const HAS_TARGET_DEPS = fs.existsSync(PYTHON_DEPS);
+function resolvePythonBin(): string {
+  const venvPython = path.resolve(process.cwd(), ".venv", "bin", "python3");
+  return fs.existsSync(venvPython) ? venvPython : "python3";
+}
 
-// Log once at module load so the Render deploy log shows exactly what
-// the runtime resolved — makes future "did the build install deps?"
-// questions a 5-second answer.
+export const PYTHON_BIN = resolvePythonBin();
+
 console.log(
-  `[python-bin] cwd=${process.cwd()} bin=${PYTHON_BIN} deps=${HAS_TARGET_DEPS ? PYTHON_DEPS : "(system)"}`
+  `[python-bin] startup cwd=${process.cwd()} bin=${PYTHON_BIN} deps=${
+    resolveDepsDir() ?? "(none — will fall back to system python)"
+  }`
 );
 
 /**
  * spawn() wrapper that selects the right interpreter and injects
- * PYTHONPATH=./python-deps when the build installed packages there.
+ * PYTHONPATH at call time (not module load time, so manual installs
+ * from the Render Shell take effect immediately).
  */
 export function spawnPython(
   args: readonly string[],
   options: SpawnOptions = {}
 ): ChildProcessByStdio<null, Readable, Readable> {
+  const depsDir = resolveDepsDir();
   const callerEnv = (options.env || {}) as Record<string, string>;
   const env: Record<string, string> = {
     ...(process.env as Record<string, string>),
     ...callerEnv,
   };
-  if (HAS_TARGET_DEPS) {
-    env.PYTHONPATH = [PYTHON_DEPS, env.PYTHONPATH || ""]
+  if (depsDir) {
+    env.PYTHONPATH = [depsDir, env.PYTHONPATH || ""]
       .filter(Boolean)
       .join(path.delimiter);
   }
