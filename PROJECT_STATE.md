@@ -401,8 +401,16 @@ Replaces the Perplexity-based deck workflow with an in-portal Claude-driven gene
 - [x] **DELETE/PATCH draft endpoints** — `PATCH` updates title or status (active/archived). `DELETE` cascades messages/attachments/outputs and unlinks files from disk.
 - [x] **Prompt tweaks v3** (in `house-style.md`): 3-row interpretation clarified (3-row OK when client selected both body styles), two more banned phrases (`earns its spot`, `if X is the headline`), explicit instruction that `client.date` comes from the `DECK DATE` section of the user payload (no longer guessed from training cutoff).
 - [x] **Current-date injection** in `generate.ts` — `buildUserPayload` now prepends a `DECK DATE` section with the actual current month/year.
-- [ ] Frontend `/decks` section: list page (with client filter), workspace page (chat + attachments + Generate + past outputs)
+- [x] **Frontend `/decks` section** — list page (client filter + status filter + search), workspace page (vehicles list, chat, attachments, Generate, past outputs). Light-mode (`.light-portal`). Decks nav item in admin sidebar.
+- [x] **Stateful vehicles list** (`deck_vehicles` table) — reorder/add/delete; "Suggest" parses plain-English vehicle text via Sonnet. Authoritative over Claude's selection when populated.
+- [x] **Attachment text extraction** — fixed extension sniffing (use original filename, not multer hash).
+- [x] **Python deps on Render — SOLVED.** Root cause: this service's build command is set in the **Render dashboard, not render.yaml**, so every `buildCommand` edit was ignored. Fix: server installs deps itself at startup via `python3 -m pip install --target=/data/python-deps` (persistent disk, survives deploys; only first boot pays the cost). See `server/deck-generator/python-bin.ts` → `ensurePythonDeps()`. **Verified working in prod 2026-06-28.**
+- [x] Intake form hydration fixed (useEffect, not render-side setState) — saved answers now repopulate on review.
+- [x] PDF summary + client detail page — render chip features (`{mustHave,niceToHave}`) by tier; parse exterior colors array.
 - [ ] Drive sync for output `.pptx` (deferred — Phase 4.5)
+- [ ] Photo sourcing pipeline (deferred — Phase 4.5; decks ship with placeholder photo boxes until then)
+
+**⚠️ Operational note:** if anything Python-related breaks on a NEW Render service or after a disk wipe, the first boot re-runs the pip install to `/data/python-deps`. Check Logs → search `python-bin` for the install status line.
 - [x] `server/deck-generator/photo-sourcing.md` committed — canonical sourcing instructions (ported from Mike's Perplexity-era playbook), first-class artifact same as house-style.md
 - [ ] **Phase 4.5 — Photo sourcing pipeline.** Separate Claude call with Anthropic `web_search` tool enabled, runs *after* deck pruning (not during initial Generate). Per-vehicle output `{front_url, rear_url, interior_url}` → Node downloads + verifies (≥800px, >5KB) → falls back to placeholder per-slot on failure. UI: workspace shows 3 photo slots per vehicle with `empty | sourced | manual` status. "Source Photos" button runs against the current vehicle list; per-slot manual upload override always available.
 
