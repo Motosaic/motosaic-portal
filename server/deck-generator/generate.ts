@@ -16,7 +16,7 @@ import { execSync } from "child_process";
 import { z } from "zod";
 import { storage } from "../storage";
 import { checkQuota, recordUsage } from "../anthropic-quota";
-import { spawnPython } from "./python-bin";
+import { spawnPython, ensurePythonDeps } from "./python-bin";
 import type {
   Client,
   DeckAttachment,
@@ -437,7 +437,10 @@ function parseAndValidateLLMOutput(text: string): DeckLLMOutput {
   return result.data;
 }
 
-function runRender(configPath: string): Promise<void> {
+async function runRender(configPath: string): Promise<void> {
+  // Make sure python-pptx is installed before spawning the renderer. On the
+  // first call after a fresh deploy this performs (or awaits) the install.
+  await ensurePythonDeps();
   return new Promise((resolve, reject) => {
     const proc = spawnPython([RENDER_PY, configPath], {
       cwd: process.cwd(),

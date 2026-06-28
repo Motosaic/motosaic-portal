@@ -15,7 +15,7 @@
 
 import fs from "fs";
 import path from "path";
-import { spawnPython } from "./python-bin";
+import { spawnPython, ensurePythonDeps } from "./python-bin";
 
 const PDF_EXTRACT_PY = `
 import sys, pypdf
@@ -80,7 +80,8 @@ export async function extractText(
   return null;
 }
 
-function extractPdfText(filePath: string): Promise<string | null> {
+async function extractPdfText(filePath: string): Promise<string | null> {
+  await ensurePythonDeps();
   return new Promise((resolve) => {
     const proc = spawnPython(["-c", PDF_EXTRACT_PY, filePath], {
       stdio: ["ignore", "pipe", "pipe"],
